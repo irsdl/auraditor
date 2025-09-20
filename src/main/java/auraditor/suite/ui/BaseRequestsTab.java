@@ -17,6 +17,7 @@ import burp.api.montoya.ui.editor.HttpRequestEditor;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.BorderFactory;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -151,7 +152,15 @@ public class BaseRequestsTab {
                         proxyRequestResponse.finalRequest(),
                         proxyRequestResponse.originalResponse()
                     );
-                    BaseRequest baseRequest = new BaseRequest(requestResponse, "Added from proxy history");
+
+                    // Create notes with annotation color information
+                    String notes = "Added from proxy history";
+                    HighlightColor requestColor = proxyRequestResponse.annotations().highlightColor();
+                    if (requestColor != null) {
+                        notes += " [Color: " + requestColor.name().toLowerCase() + "]";
+                    }
+
+                    BaseRequest baseRequest = new BaseRequest(requestResponse, notes);
                     baseRequests.add(baseRequest);
 
                     // Refresh table and notify callback
@@ -197,7 +206,11 @@ public class BaseRequestsTab {
         SwingUtilities.invokeLater(() -> {
             // Create a temporary notification panel
             JPanel notificationPanel = new JPanel(new BorderLayout());
-            JLabel messageLabel = new JLabel("<html><div style='padding: 10px;'>" + message.replace("\n", "<br>") + "</div></html>");
+
+            // Handle multi-line messages without HTML
+            String displayMessage = message.replace("\n", " | ");
+            JLabel messageLabel = new JLabel(" " + displayMessage + " ");
+            messageLabel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
             // Set colors based on message type
             Color backgroundColor;

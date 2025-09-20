@@ -21,7 +21,7 @@ public class BurpExtender implements BurpExtension {
 
 		// Log version and build information
 		String version = "2.0.1";
-		String buildDate = "2025-09-20 20:47";
+		String buildDate = "2025-09-20 21:12";
 		api.logging().logToOutput("=== Auraditor Extension Starting ===");
 		api.logging().logToOutput("Version: " + version);
 		api.logging().logToOutput("Build Date: " + buildDate);

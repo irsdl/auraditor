@@ -245,7 +245,11 @@ public class AuraditorSuiteTab {
      * @param requestResponse The request/response to add
      */
     public void addBaseRequest(HttpRequestResponse requestResponse) {
-        addBaseRequest(requestResponse, "");
+        // Add timestamp when adding from context menu
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        String timestamp = now.format(formatter);
+        addBaseRequest(requestResponse, "Added via context menu at " + timestamp);
     }
     
     /**
