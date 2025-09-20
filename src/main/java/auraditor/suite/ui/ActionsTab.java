@@ -638,7 +638,7 @@ public class ActionsTab {
      */
     private String generateRetrievedObjectsResultId() {
         retrievedObjectsResultCounter++;
-        return "Retrieved Objects-" + retrievedObjectsResultCounter;
+        return "Retrieved Objects " + retrievedObjectsResultCounter;
     }
     
     /**
@@ -646,7 +646,7 @@ public class ActionsTab {
      */
     private String getUserTabChoice() {
         // Check if there are existing retrieved objects tabs
-        String lastTabId = "Retrieved Objects-" + retrievedObjectsResultCounter;
+        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
         
         // Show dialog asking user preference
         Object[] options = {"Append to current tab (" + lastTabId + ")", "Create new tab"};
@@ -684,7 +684,7 @@ public class ActionsTab {
         }
         
         // Show dialog asking user preference
-        String lastTabId = "Retrieved Objects-" + retrievedObjectsResultCounter;
+        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
         Object[] options = {
             "Append to current tab (" + lastTabId + ")", 
             "Create new tab", 
