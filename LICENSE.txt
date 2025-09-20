@@ -1,0 +1,34 @@
+BSD 3-Clause License
+
+Original work Copyright (c) 2020, salesforce.com, inc.
+Modifications and enhancements Copyright (c) 2025, Soroush Dalili (@irsdl)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holders nor the names of contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ADDITIONAL DISCLAIMER FOR SECURITY TESTING TOOLS
+
+This software is designed for security testing and research purposes. The maintainer(s) 
+and contributors:
+
+- ARE NOT RESPONSIBLE for any use or misuse of this tool
+- PROVIDE NO SUPPORT, WARRANTY, or GUARANTEE that the tool will work properly
+- ARE NOT LIABLE for any harm, damage, or legal consequences resulting from the use of this tool
+- DISCLAIM ALL RESPONSIBILITY for how this tool is used by third parties
+
+Users of this software assume ALL RESPONSIBILITY and LIABILITY for:
+- Ensuring they have proper authorization before testing any systems
+- Compliance with all applicable laws and regulations
+- Any consequences of using this tool
+- Any damage or harm that may result from the use of this tool
+
+This tool is intended for use by security professionals, researchers, and authorized 
+penetration testers only. Use at your own risk.
