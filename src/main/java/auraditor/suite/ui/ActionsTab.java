@@ -1926,8 +1926,12 @@ public class ActionsTab {
                     return;
                 }
 
-                // Generate result ID
-                String wordlistResultId = generateObjsByWordlistResultId(selectedRequest.getId());
+                // Ask user about tab choice before starting wordlist scan
+                String wordlistResultId = getUserTabChoiceForBulkRetrieval("wordlist objects", -1); // Unknown count
+                if (wordlistResultId == null) {
+                    return; // User cancelled
+                }
+
                 String wordlistSource = usePresetWordlistCheckbox.isSelected() ?
                     "preset wordlist" : selectedWordlistFile.getName();
 
