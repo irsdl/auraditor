@@ -899,7 +899,9 @@ public class ActionsTab {
                     }
 
                     // Send the request
+                    api.logging().logToOutput("Sending HTTP request for object: " + objectName);
                     HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
+                    api.logging().logToOutput("HTTP request completed for object: " + objectName);
                     
                     // Check for cancellation after request
                     if (operationCancelled || Thread.currentThread().isInterrupted()) {
@@ -1132,7 +1134,9 @@ public class ActionsTab {
                     }
 
                     // Send the request
+                    api.logging().logToOutput("Sending HTTP request for object: " + objectName);
                     HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
+                    api.logging().logToOutput("HTTP request completed for object: " + objectName);
 
                     // Check for cancellation after request
                     if (operationCancelled || Thread.currentThread().isInterrupted()) {
@@ -1703,13 +1707,31 @@ public class ActionsTab {
         
         // Cancel button handler
         cancelBtn.addActionListener(e -> {
-            api.logging().logToOutput("Operation cancelled by user");
-            operationCancelled = true; // Set cancellation flag
+            api.logging().logToOutput("Operation cancelled by user - stopping all requests");
+            operationCancelled = true; // Set cancellation flag immediately
+
+            // More aggressive thread stopping
             if (currentOperationThread != null && currentOperationThread.isAlive()) {
+                api.logging().logToOutput("Interrupting operation thread: " + currentOperationThread.getName());
                 currentOperationThread.interrupt();
+
+                // Try to wait briefly for graceful shutdown
+                try {
+                    currentOperationThread.join(100); // Wait max 100ms
+                } catch (InterruptedException ignored) {
+                    // Ignore interruption during join
+                }
+
+                // Force stop if still alive
+                if (currentOperationThread.isAlive()) {
+                    api.logging().logToOutput("Thread still alive after interrupt, clearing reference");
+                }
+
                 currentOperationThread = null; // Clear thread reference
             }
+
             clearBulkRetrievalState(); // Use bulk-specific clear method
+            api.logging().logToOutput("Cancellation complete - no new requests should be sent");
         });
         
         // Add document listener to object name field to enable/disable button
