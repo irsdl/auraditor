@@ -1202,13 +1202,45 @@ public class ActionsTab {
 
                     // Parse response and check if object exists
                     String responseBody = response.response().bodyToString();
-                    if (responseBody.contains("\"success\":true") && !responseBody.contains("INVALID_TYPE")) {
+
+                    // Debug logging to understand response format
+                    api.logging().logToOutput("Wordlist scan - checking object: " + objectName);
+                    api.logging().logToOutput("Response contains success:true: " + responseBody.contains("\"success\":true"));
+                    api.logging().logToOutput("Response contains INVALID_TYPE: " + responseBody.contains("INVALID_TYPE"));
+
+                    // Try to parse the response to see if it contains actual data
+                    boolean hasValidData = false;
+                    try {
+                        // Use the same parsing logic as the incremental parser to check for valid data
+                        ObjectMapper mapper = new ObjectMapper();
+                        JsonNode rootNode = mapper.readTree(responseBody);
+                        JsonNode actionsNode = rootNode.path("actions");
+
+                        if (actionsNode.isArray() && actionsNode.size() > 0) {
+                            JsonNode firstAction = actionsNode.get(0);
+                            JsonNode returnValue = firstAction.path("returnValue");
+                            JsonNode resultArray = returnValue.path("result");
+
+                            // Check if we have actual result data (not just empty array)
+                            if (resultArray.isArray() && resultArray.size() > 0) {
+                                hasValidData = true;
+                                api.logging().logToOutput("Found valid data for object: " + objectName + " (records: " + resultArray.size() + ")");
+                            }
+                        }
+                    } catch (Exception e) {
+                        api.logging().logToOutput("Error parsing response for object " + objectName + ": " + e.getMessage());
+                    }
+
+                    // Use either the original condition OR the new data validation
+                    if ((responseBody.contains("\"success\":true") && !responseBody.contains("INVALID_TYPE")) || hasValidData) {
                         foundObjects[0]++;
 
                         // Parse and immediately add to tab
                         parseBulkObjectResponseIncremental(responseBody, tabId, objectName, baseRequest.getId());
 
-                        api.logging().logToOutput("Found object: " + objectName);
+                        api.logging().logToOutput("Added object to tab: " + objectName);
+                    } else {
+                        api.logging().logToOutput("Skipped object (no valid data): " + objectName);
                     }
 
                     // Add delay if configured
@@ -1526,30 +1558,29 @@ public class ActionsTab {
                 jsonData = jsonContent.toString();
             }
             
-            // Add the object entry to the accumulated results
-            objectByNameResults.addObjectEntry(objectEntryName, jsonData);
-            
+            // Add the object entry to the tab's ObjectByNameResult (like other operations)
             SwingUtilities.invokeLater(() -> {
-                clearBusyState();
-                
-                // Determine tab ID - ask user if this isn't the first object
-                String tabId;
-                if (objectByNameResults.getObjectEntries().size() == 1) {
-                    // First object - create new tab
-                    tabId = generateRetrievedObjectsResultId();
-                } else {
-                    // Ask user if they want to append or create new tab
-                    tabId = getUserTabChoice();
+                // Initialize the ObjectByNameResult for this tab (or use existing if appending)
+                if (!tabObjectResults.containsKey(resultId)) {
+                    // New tab - create fresh results
+                    tabObjectResults.put(resultId, new ObjectByNameResult());
                 }
-                
-                // Use the new createObjectByNameTab method
-                resultTabCallback.createObjectByNameTab(tabId, objectByNameResults);
-                
+
+                // Add entry to the tab's results
+                ObjectByNameResult tabResult = tabObjectResults.get(resultId);
+                if (tabResult != null) {
+                    tabResult.addObjectEntry(objectEntryName, jsonData);
+                    // Update the tab content
+                    resultTabCallback.createObjectByNameTab(resultId, tabResult);
+                }
+
+                clearBusyState();
+
                 if (resultArray.size() == 0) {
-                    showStatusMessage("✗ No results found for object '" + objectName + "' - " + tabId, Color.ORANGE);
+                    showStatusMessage("✗ No results found for object '" + objectName + "' - " + resultId, Color.ORANGE);
                     api.logging().logToOutput("No data found for object: " + objectName);
                 } else {
-                    showStatusMessage("✓ Found " + resultArray.size() + " records for object '" + objectName + "' - " + tabId, Color.GREEN);
+                    showStatusMessage("✓ Found " + resultArray.size() + " records for object '" + objectName + "' - " + resultId, Color.GREEN);
                     api.logging().logToOutput("Specific object search completed successfully:");
                     api.logging().logToOutput("  Object: " + objectName);
                     api.logging().logToOutput("  Records found: " + resultArray.size());
@@ -1938,10 +1969,15 @@ public class ActionsTab {
                     showErrorMessage("Please enter an object name to search for.");
                     return;
                 }
+
+                // Ask user about tab choice before starting object search
+                String objByNameResultId = getUserTabChoiceForBulkRetrieval("object '" + objectName + "'", 1);
+                if (objByNameResultId == null) {
+                    return; // User cancelled
+                }
+
                 setBusyState(findObjectByNameBtn, "Getting Object by Name");
-                // Use fixed result ID for reusable Object by Name tab
-                String objByNameResultId = "Object by Name";
-                
+
                 // Perform specific object search in background thread
                 new Thread(() -> {
                     try {
