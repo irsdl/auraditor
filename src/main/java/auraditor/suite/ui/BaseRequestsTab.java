@@ -9,6 +9,9 @@ package auraditor.suite.ui;
 import auraditor.suite.BaseRequest;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
+import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.proxy.ProxyHistoryFilter;
+import burp.api.montoya.proxy.ProxyHttpRequestResponse;
 import burp.api.montoya.ui.editor.HttpRequestEditor;
 
 import javax.swing.*;
@@ -42,28 +45,146 @@ public class BaseRequestsTab {
         
         // Create main panel
         this.mainPanel = new JPanel(new BorderLayout());
-        
+
+        // Create top panel with button
+        JPanel topPanel = createTopPanel();
+        this.mainPanel.add(topPanel, BorderLayout.NORTH);
+
         // Create table model and table
         this.tableModel = new BaseRequestTableModel();
         this.requestTable = new JTable(tableModel);
         setupTable();
-        
+
         // Create request viewer panel
         this.requestViewerPanel = new JPanel(new BorderLayout());
         this.requestEditor = api.userInterface().createHttpRequestEditor();
         setupRequestViewer();
-        
+
         // Create split pane with table on top and request viewer on bottom
         JScrollPane tableScrollPane = new JScrollPane(requestTable);
         this.splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, tableScrollPane, requestViewerPanel);
         this.splitPane.setDividerLocation(300); // Set initial divider position
         this.splitPane.setResizeWeight(0.6); // Give more space to table
-        
-        // Add header (removed the description text that was causing confusion)
-        // Visual feedback will now be handled at the tab title level
+
+        // Add split pane to center
         this.mainPanel.add(splitPane, BorderLayout.CENTER);
     }
-    
+
+    /**
+     * Create top panel with "Add Latest Compatible Request" button
+     */
+    private JPanel createTopPanel() {
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+
+        JButton addLatestRequestBtn = new JButton("Add Latest Compatible Request");
+        addLatestRequestBtn.setToolTipText("Search proxy history for the most recent POST request with /aura in URL and required parameters");
+        addLatestRequestBtn.addActionListener(e -> addLatestCompatibleRequest());
+
+        topPanel.add(addLatestRequestBtn);
+
+        return topPanel;
+    }
+
+    /**
+     * Search proxy history for the latest compatible Aura request and add it to base requests
+     */
+    private void addLatestCompatibleRequest() {
+        try {
+            api.logging().logToOutput("Searching proxy history for latest compatible Aura request...");
+
+            // Search proxy history for compatible requests
+            List<ProxyHttpRequestResponse> proxyHistory = api.proxy().history();
+
+            // Search from most recent to oldest
+            for (int i = proxyHistory.size() - 1; i >= 0; i--) {
+                ProxyHttpRequestResponse proxyRequestResponse = proxyHistory.get(i);
+                HttpRequest request = proxyRequestResponse.finalRequest();
+
+                // Check if this is a compatible Aura request
+                if (isCompatibleAuraRequest(request)) {
+                    // Create BaseRequest and add it (convert ProxyHttpRequestResponse to HttpRequestResponse)
+                    HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
+                        proxyRequestResponse.finalRequest(),
+                        proxyRequestResponse.originalResponse()
+                    );
+                    BaseRequest baseRequest = new BaseRequest(requestResponse, "Added from proxy history");
+                    baseRequests.add(baseRequest);
+
+                    // Refresh table and notify callback
+                    refreshTable();
+                    if (onRequestsChangedCallback != null) {
+                        onRequestsChangedCallback.run();
+                    }
+
+                    api.logging().logToOutput("Added compatible Aura request: " + request.url());
+
+                    // Show success message
+                    JOptionPane.showMessageDialog(
+                        mainPanel,
+                        "Successfully added compatible Aura request:\n" + request.url(),
+                        "Request Added",
+                        JOptionPane.INFORMATION_MESSAGE
+                    );
+                    return;
+                }
+            }
+
+            // No compatible request found
+            api.logging().logToOutput("No compatible Aura request found in proxy history");
+            JOptionPane.showMessageDialog(
+                mainPanel,
+                "No compatible Aura request found in proxy history.\n\n" +
+                "Looking for POST requests with:\n" +
+                "• '/aura' in URL path\n" +
+                "• 'message' parameter\n" +
+                "• 'aura.token' parameter\n" +
+                "• 'aura.context' parameter",
+                "No Compatible Request Found",
+                JOptionPane.WARNING_MESSAGE
+            );
+
+        } catch (Exception e) {
+            api.logging().logToError("Error searching proxy history: " + e.getMessage());
+            JOptionPane.showMessageDialog(
+                mainPanel,
+                "Error searching proxy history: " + e.getMessage(),
+                "Search Error",
+                JOptionPane.ERROR_MESSAGE
+            );
+        }
+    }
+
+    /**
+     * Check if a request is a compatible Aura request
+     */
+    private boolean isCompatibleAuraRequest(HttpRequest request) {
+        try {
+            // Check if it's a POST request
+            if (!request.method().equals("POST")) {
+                return false;
+            }
+
+            // Check if URL contains "/aura"
+            String url = request.url();
+            if (!url.contains("/aura")) {
+                return false;
+            }
+
+            // Check for required parameters in the POST body
+            String body = request.bodyToString();
+
+            boolean hasMessage = body.contains("message=") || body.contains("\"message\":");
+            boolean hasAuraToken = body.contains("aura.token=") || body.contains("\"aura.token\":");
+            boolean hasAuraContext = body.contains("aura.context=") || body.contains("\"aura.context\":");
+
+            return hasMessage && hasAuraToken && hasAuraContext;
+
+        } catch (Exception e) {
+            api.logging().logToError("Error checking request compatibility: " + e.getMessage());
+            return false;
+        }
+    }
+
     private void setupTable() {
         // Set column widths
         requestTable.getColumnModel().getColumn(0).setPreferredWidth(50);  // ID
