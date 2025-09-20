@@ -42,7 +42,7 @@ public class BaseRequestsTab {
     public BaseRequestsTab(MontoyaApi api, List<BaseRequest> baseRequests) {
         this.api = api;
         this.baseRequests = baseRequests;
-        
+
         // Create main panel
         this.mainPanel = new JPanel(new BorderLayout());
 
@@ -118,40 +118,90 @@ public class BaseRequestsTab {
 
                     api.logging().logToOutput("Added compatible Aura request: " + request.url());
 
-                    // Show success message
-                    JOptionPane.showMessageDialog(
-                        mainPanel,
-                        "Successfully added compatible Aura request:\n" + request.url(),
-                        "Request Added",
-                        JOptionPane.INFORMATION_MESSAGE
-                    );
+                    // Show non-blocking success message
+                    showNonBlockingMessage("✓ Successfully added compatible Aura request:\n" + request.url(), "success");
                     return;
                 }
             }
 
             // No compatible request found
             api.logging().logToOutput("No compatible Aura request found in proxy history");
-            JOptionPane.showMessageDialog(
-                mainPanel,
-                "No compatible Aura request found in proxy history.\n\n" +
+            showNonBlockingMessage(
+                "⚠ No compatible Aura request found in proxy history.\n\n" +
                 "Looking for POST requests with:\n" +
                 "• '/aura' in URL path\n" +
                 "• 'message' parameter\n" +
                 "• 'aura.token' parameter\n" +
                 "• 'aura.context' parameter",
-                "No Compatible Request Found",
-                JOptionPane.WARNING_MESSAGE
+                "warning"
             );
 
         } catch (Exception e) {
             api.logging().logToError("Error searching proxy history: " + e.getMessage());
-            JOptionPane.showMessageDialog(
-                mainPanel,
-                "Error searching proxy history: " + e.getMessage(),
-                "Search Error",
-                JOptionPane.ERROR_MESSAGE
-            );
+            showNonBlockingMessage("❌ Error searching proxy history: " + e.getMessage(), "error");
         }
+    }
+
+    /**
+     * Show non-blocking message using a temporary status label
+     */
+    private void showNonBlockingMessage(String message, String type) {
+        SwingUtilities.invokeLater(() -> {
+            // Create a temporary notification panel
+            JPanel notificationPanel = new JPanel(new BorderLayout());
+            JLabel messageLabel = new JLabel("<html><div style='padding: 10px;'>" + message.replace("\n", "<br>") + "</div></html>");
+
+            // Set colors based on message type
+            Color backgroundColor;
+            Color textColor = Color.WHITE;
+            switch (type.toLowerCase()) {
+                case "success":
+                    backgroundColor = new Color(76, 175, 80); // Green
+                    break;
+                case "warning":
+                    backgroundColor = new Color(255, 152, 0); // Orange
+                    break;
+                case "error":
+                    backgroundColor = new Color(244, 67, 54); // Red
+                    break;
+                default:
+                    backgroundColor = new Color(33, 150, 243); // Blue
+                    break;
+            }
+
+            notificationPanel.setBackground(backgroundColor);
+            messageLabel.setForeground(textColor);
+            messageLabel.setOpaque(false);
+            notificationPanel.add(messageLabel, BorderLayout.CENTER);
+
+            // Add close button
+            JButton closeBtn = new JButton("×");
+            closeBtn.setPreferredSize(new Dimension(25, 25));
+            closeBtn.setBackground(backgroundColor);
+            closeBtn.setForeground(textColor);
+            closeBtn.setBorderPainted(false);
+            closeBtn.setFocusPainted(false);
+            closeBtn.addActionListener(e -> {
+                mainPanel.remove(notificationPanel);
+                mainPanel.revalidate();
+                mainPanel.repaint();
+            });
+            notificationPanel.add(closeBtn, BorderLayout.EAST);
+
+            // Add to top of main panel
+            mainPanel.add(notificationPanel, BorderLayout.SOUTH);
+            mainPanel.revalidate();
+            mainPanel.repaint();
+
+            // Auto-hide after 5 seconds
+            Timer timer = new Timer(5000, e -> {
+                mainPanel.remove(notificationPanel);
+                mainPanel.revalidate();
+                mainPanel.repaint();
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
     }
 
     /**

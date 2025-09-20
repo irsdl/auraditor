@@ -19,6 +19,14 @@ public class BurpExtender implements BurpExtension {
 	public void initialize(MontoyaApi api) {
 		api.extension().setName("Auraditor");
 
+		// Log version and build information
+		String version = "2.0.1";
+		String buildDate = "2025-09-20 20:42";
+		api.logging().logToOutput("=== Auraditor Extension Starting ===");
+		api.logging().logToOutput("Version: " + version);
+		api.logging().logToOutput("Build Date: " + buildDate);
+		api.logging().logToOutput("Features: Enhanced cancel button, filtering fixes, Add Latest Compatible Request button (non-blocking UI)");
+
 		// Register separate tab factories for Actions and Context (existing functionality)
 		AuraActionsTabFactory actionsFactory = new AuraActionsTabFactory(api);
 		api.userInterface().registerHttpRequestEditorProvider(actionsFactory);
@@ -29,16 +37,19 @@ public class BurpExtender implements BurpExtension {
 		api.userInterface().registerHttpResponseEditorProvider(contextFactory);
 
 		// Create and register the main Auraditor suite tab
+		api.logging().logToOutput("Creating Auraditor Suite Tab...");
 		AuraditorSuiteTab auraditorSuiteTab = new AuraditorSuiteTab(api);
 		api.userInterface().registerSuiteTab("Auraditor", auraditorSuiteTab.getComponent());
+		api.logging().logToOutput("Auraditor Suite Tab registered successfully");
 
 		// Register context menu provider for "Send to Auraditor"
 		AuraditorContextMenuProvider contextMenuProvider = new AuraditorContextMenuProvider(auraditorSuiteTab);
 		api.userInterface().registerContextMenuItemsProvider(contextMenuProvider);
 
-		api.logging().logToOutput("Auraditor extension loaded successfully!");
+		api.logging().logToOutput("=== Auraditor Extension Loaded Successfully! ===");
 		api.logging().logToOutput("- Aura Actions/Context tabs available in HTTP message editors");
-		api.logging().logToOutput("- Main Auraditor tab available in suite");
+		api.logging().logToOutput("- Main Auraditor tab available in suite (with 'Add Latest Compatible Request' button)");
 		api.logging().logToOutput("- Right-click 'Send to Auraditor' available for Aura requests");
+		api.logging().logToOutput("=====================================");
 	}
 }
