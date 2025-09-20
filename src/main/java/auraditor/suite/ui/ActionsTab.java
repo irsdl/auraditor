@@ -835,10 +835,14 @@ public class ActionsTab {
         
         // Create the tab immediately with in-progress indicator
         SwingUtilities.invokeLater(() -> {
-            // Initialize the ObjectByNameResult for this tab
-            tabObjectResults.put(tabId, new ObjectByNameResult());
-            
-            // Create the tab immediately with the final tab title
+            // Initialize the ObjectByNameResult for this tab (or use existing if appending)
+            if (!tabObjectResults.containsKey(tabId)) {
+                // New tab - create fresh results
+                tabObjectResults.put(tabId, new ObjectByNameResult());
+            }
+            // If tab already exists, keep existing results for appending
+
+            // Create/update the tab immediately with the final tab title
             // The tab content will be updated as objects are retrieved
             resultTabCallback.createObjectByNameTab(tabId, tabObjectResults.get(tabId));
         });
@@ -1094,7 +1098,13 @@ public class ActionsTab {
 
         // Create the result tab immediately with in-progress indicator
         SwingUtilities.invokeLater(() -> {
-            tabObjectResults.put(tabId, new ObjectByNameResult());
+            // Initialize the ObjectByNameResult for this tab (or use existing if appending)
+            if (!tabObjectResults.containsKey(tabId)) {
+                // New tab - create fresh results
+                tabObjectResults.put(tabId, new ObjectByNameResult());
+            }
+            // If tab already exists, keep existing results for appending
+
             resultTabCallback.createObjectByNameTab(tabId, tabObjectResults.get(tabId));
         });
 
