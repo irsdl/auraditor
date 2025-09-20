@@ -675,26 +675,36 @@ public class ActionsTab {
      * Get user's choice for tab handling when performing bulk retrieval
      */
     private String getUserTabChoiceForBulkRetrieval(String objectType, int objectCount) {
-        // Check if there are existing retrieved objects with data
-        boolean hasExistingData = !objectByNameResults.getObjectEntries().isEmpty();
-        
-        if (!hasExistingData) {
-            // No existing data, create new tab
-            return generateRetrievedObjectsResultId();
-        }
-        
-        // Show dialog asking user preference
+        // Check if there are existing retrieved objects tabs (use counter instead of current data)
+        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
+
+        // Always show dialog asking user preference
         String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
-        Object[] options = {
-            "Append to current tab (" + lastTabId + ")", 
-            "Create new tab", 
-            "Cancel"
-        };
+        Object[] options;
+        String message;
+
+        if (hasExistingTabs) {
+            options = new Object[]{
+                "Append to current tab (" + lastTabId + ")",
+                "Create new tab",
+                "Cancel"
+            };
+            String countText = objectCount > 0 ? objectCount + " " : "";
+            message = "You are about to retrieve " + countText + objectType + ".\n" +
+                     "You already have retrieved objects. How would you like to proceed?";
+        } else {
+            options = new Object[]{
+                "Create new tab",
+                "Cancel"
+            };
+            String countText = objectCount > 0 ? objectCount + " " : "";
+            message = "You are about to retrieve " + countText + objectType + ".\n" +
+                     "How would you like to proceed?";
+        }
         
         int choice = JOptionPane.showOptionDialog(
             mainPanel,
-            "You are about to retrieve " + objectCount + " " + objectType + ".\n" +
-            "You already have retrieved objects. How would you like to proceed?",
+            message,
             "Bulk Retrieval - Tab Selection",
             JOptionPane.YES_NO_CANCEL_OPTION,
             JOptionPane.QUESTION_MESSAGE,
@@ -703,14 +713,23 @@ public class ActionsTab {
             options[0]
         );
         
-        switch (choice) {
-            case 0: // Append to existing tab
-                return lastTabId;
-            case 1: // Create new tab
-                objectByNameResults = new ObjectByNameResult();
-                return generateRetrievedObjectsResultId();
-            default: // Cancel or close
-                return null;
+        if (hasExistingTabs) {
+            switch (choice) {
+                case 0: // Append to existing tab
+                    return lastTabId;
+                case 1: // Create new tab
+                    objectByNameResults = new ObjectByNameResult();
+                    return generateRetrievedObjectsResultId();
+                default: // Cancel or close
+                    return null;
+            }
+        } else {
+            switch (choice) {
+                case 0: // Create new tab (only option)
+                    return generateRetrievedObjectsResultId();
+                default: // Cancel or close
+                    return null;
+            }
         }
     }
     
