@@ -846,6 +846,19 @@ public class ActionsTab {
                     // Check for cancellation again before processing each object
                     if (operationCancelled || Thread.currentThread().isInterrupted()) {
                         api.logging().logToOutput("Bulk object retrieval cancelled during processing");
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null; // Clear thread reference
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Operation cancelled - " + successfulObjects[0] + " objects retrieved", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Operation cancelled", Color.RED);
+                            }
+                        });
                         return;
                     }
                     
@@ -872,6 +885,19 @@ public class ActionsTab {
                     // Check for cancellation after request
                     if (operationCancelled || Thread.currentThread().isInterrupted()) {
                         api.logging().logToOutput("Bulk object retrieval cancelled after request");
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null; // Clear thread reference
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Operation cancelled - " + successfulObjects[0] + " objects retrieved", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Operation cancelled", Color.RED);
+                            }
+                        });
                         return;
                     }
                     
