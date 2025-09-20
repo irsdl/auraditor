@@ -878,7 +878,26 @@ public class ActionsTab {
                     // Create a modified request with the specific object payload in the message parameter
                     HttpRequest originalRequest = baseRequest.getRequestResponse().request();
                     HttpRequest specificObjectRequest = modifyMessageParameter(originalRequest, specificObjectPayload);
-                    
+
+                    // Check for cancellation BEFORE sending request (this is critical)
+                    if (operationCancelled || Thread.currentThread().isInterrupted()) {
+                        api.logging().logToOutput("Bulk object retrieval cancelled before sending request for: " + objectName);
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null;
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Operation cancelled - " + successfulObjects[0] + " objects retrieved", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Operation cancelled", Color.RED);
+                            }
+                        });
+                        return;
+                    }
+
                     // Send the request
                     HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
                     
@@ -1092,6 +1111,25 @@ public class ActionsTab {
                     String specificObjectPayload = String.format(SPECIFIC_OBJECT_PAYLOAD_TEMPLATE, escapedObjectName);
                     HttpRequest originalRequest = baseRequest.getRequestResponse().request();
                     HttpRequest specificObjectRequest = modifyMessageParameter(originalRequest, specificObjectPayload);
+
+                    // Check for cancellation BEFORE sending request (this is critical)
+                    if (operationCancelled || Thread.currentThread().isInterrupted()) {
+                        api.logging().logToOutput("Wordlist scan cancelled before sending request for: " + objectName);
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null;
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Wordlist scan cancelled - " + foundObjects[0] + " objects found", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Wordlist scan cancelled", Color.RED);
+                            }
+                        });
+                        return;
+                    }
 
                     // Send the request
                     HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
