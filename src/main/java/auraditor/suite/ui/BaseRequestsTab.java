@@ -12,6 +12,7 @@ import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.proxy.ProxyHistoryFilter;
 import burp.api.montoya.proxy.ProxyHttpRequestResponse;
+import burp.api.montoya.core.HighlightColor;
 import burp.api.montoya.ui.editor.HttpRequestEditor;
 
 import javax.swing.*;
@@ -38,6 +39,10 @@ public class BaseRequestsTab {
     private final JPanel requestViewerPanel;
     private final HttpRequestEditor requestEditor;
     private Runnable onRequestsChangedCallback; // Callback for when requests are deleted
+
+    // Color annotation components
+    private JCheckBox useColorAnnotationCheckBox;
+    private JComboBox<HighlightColor> colorSelector;
     
     public BaseRequestsTab(MontoyaApi api, List<BaseRequest> baseRequests) {
         this.api = api;
@@ -76,11 +81,50 @@ public class BaseRequestsTab {
     private JPanel createTopPanel() {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
 
+        // Add Latest Compatible Request button
         JButton addLatestRequestBtn = new JButton("Add Latest Compatible Request");
         addLatestRequestBtn.setToolTipText("Search proxy history for the most recent POST request with /aura in URL and required parameters");
         addLatestRequestBtn.addActionListener(e -> addLatestCompatibleRequest());
-
         topPanel.add(addLatestRequestBtn);
+
+        // Color annotation checkbox
+        useColorAnnotationCheckBox = new JCheckBox("Use color annotation");
+        useColorAnnotationCheckBox.setToolTipText("Also filter by annotation color when searching for compatible requests");
+        useColorAnnotationCheckBox.addActionListener(e -> colorSelector.setEnabled(useColorAnnotationCheckBox.isSelected()));
+        topPanel.add(useColorAnnotationCheckBox);
+
+        // Color selector dropdown
+        HighlightColor[] colors = {
+            HighlightColor.RED,
+            HighlightColor.ORANGE,
+            HighlightColor.YELLOW,
+            HighlightColor.GREEN,
+            HighlightColor.CYAN,
+            HighlightColor.BLUE,
+            HighlightColor.PINK,
+            HighlightColor.MAGENTA,
+            HighlightColor.GRAY
+        };
+
+        colorSelector = new JComboBox<>(colors);
+        colorSelector.setEnabled(false); // Initially disabled
+        colorSelector.setToolTipText("Select the annotation color to filter by");
+
+        // Custom renderer to show color names properly
+        colorSelector.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                    boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                if (value instanceof HighlightColor) {
+                    HighlightColor color = (HighlightColor) value;
+                    setText(color.name().toLowerCase().replace("_", " "));
+                }
+                return this;
+            }
+        });
+
+        topPanel.add(colorSelector);
 
         return topPanel;
     }
@@ -100,8 +144,8 @@ public class BaseRequestsTab {
                 ProxyHttpRequestResponse proxyRequestResponse = proxyHistory.get(i);
                 HttpRequest request = proxyRequestResponse.finalRequest();
 
-                // Check if this is a compatible Aura request
-                if (isCompatibleAuraRequest(request)) {
+                // Check if this is a compatible Aura request (including color annotation if enabled)
+                if (isCompatibleAuraRequest(proxyRequestResponse)) {
                     // Create BaseRequest and add it (convert ProxyHttpRequestResponse to HttpRequestResponse)
                     HttpRequestResponse requestResponse = HttpRequestResponse.httpRequestResponse(
                         proxyRequestResponse.finalRequest(),
@@ -116,15 +160,19 @@ public class BaseRequestsTab {
                         onRequestsChangedCallback.run();
                     }
 
-                    api.logging().logToOutput("Added compatible Aura request: " + request.url());
+                    String colorInfo = useColorAnnotationCheckBox.isSelected() ?
+                        " (with " + ((HighlightColor) colorSelector.getSelectedItem()).name().toLowerCase() + " annotation)" : "";
+                    api.logging().logToOutput("Added compatible Aura request: " + request.url() + colorInfo);
 
                     // Show non-blocking success message
-                    showNonBlockingMessage("✓ Successfully added compatible Aura request:\n" + request.url(), "success");
+                    showNonBlockingMessage("✓ Successfully added compatible Aura request" + colorInfo + ":\n" + request.url(), "success");
                     return;
                 }
             }
 
             // No compatible request found
+            String colorFilterInfo = useColorAnnotationCheckBox.isSelected() ?
+                "\n• " + ((HighlightColor) colorSelector.getSelectedItem()).name().toLowerCase() + " annotation color" : "";
             api.logging().logToOutput("No compatible Aura request found in proxy history");
             showNonBlockingMessage(
                 "⚠ No compatible Aura request found in proxy history.\n\n" +
@@ -132,7 +180,7 @@ public class BaseRequestsTab {
                 "• '/aura' in URL path\n" +
                 "• 'message' parameter\n" +
                 "• 'aura.token' parameter\n" +
-                "• 'aura.context' parameter",
+                "• 'aura.context' parameter" + colorFilterInfo,
                 "warning"
             );
 
@@ -205,10 +253,12 @@ public class BaseRequestsTab {
     }
 
     /**
-     * Check if a request is a compatible Aura request
+     * Check if a proxy request is a compatible Aura request (including color annotation check)
      */
-    private boolean isCompatibleAuraRequest(HttpRequest request) {
+    private boolean isCompatibleAuraRequest(ProxyHttpRequestResponse proxyRequestResponse) {
         try {
+            HttpRequest request = proxyRequestResponse.finalRequest();
+
             // Check if it's a POST request
             if (!request.method().equals("POST")) {
                 return false;
@@ -227,7 +277,23 @@ public class BaseRequestsTab {
             boolean hasAuraToken = body.contains("aura.token=") || body.contains("\"aura.token\":");
             boolean hasAuraContext = body.contains("aura.context=") || body.contains("\"aura.context\":");
 
-            return hasMessage && hasAuraToken && hasAuraContext;
+            if (!hasMessage || !hasAuraToken || !hasAuraContext) {
+                return false;
+            }
+
+            // Check color annotation if enabled
+            if (useColorAnnotationCheckBox.isSelected()) {
+                HighlightColor selectedColor = (HighlightColor) colorSelector.getSelectedItem();
+                if (selectedColor != null) {
+                    // Check if the proxy request has the selected annotation color
+                    HighlightColor requestColor = proxyRequestResponse.annotations().highlightColor();
+                    if (!selectedColor.equals(requestColor)) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
 
         } catch (Exception e) {
             api.logging().logToError("Error checking request compatibility: " + e.getMessage());

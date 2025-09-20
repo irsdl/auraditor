@@ -21,11 +21,11 @@ public class BurpExtender implements BurpExtension {
 
 		// Log version and build information
 		String version = "2.0.1";
-		String buildDate = "2025-09-20 20:42";
+		String buildDate = "2025-09-20 20:47";
 		api.logging().logToOutput("=== Auraditor Extension Starting ===");
 		api.logging().logToOutput("Version: " + version);
 		api.logging().logToOutput("Build Date: " + buildDate);
-		api.logging().logToOutput("Features: Enhanced cancel button, filtering fixes, Add Latest Compatible Request button (non-blocking UI)");
+		api.logging().logToOutput("Features: Enhanced cancel button, filtering fixes, Add Latest Compatible Request button (non-blocking UI + color annotation filtering)");
 
 		// Register separate tab factories for Actions and Context (existing functionality)
 		AuraActionsTabFactory actionsFactory = new AuraActionsTabFactory(api);
