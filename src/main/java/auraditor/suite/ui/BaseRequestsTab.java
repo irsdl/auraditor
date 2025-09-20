@@ -44,6 +44,9 @@ public class BaseRequestsTab {
     // Color annotation components
     private JCheckBox useColorAnnotationCheckBox;
     private JComboBox<HighlightColor> colorSelector;
+
+    // Remove Authentication button
+    private JButton removeAuthButton;
     
     public BaseRequestsTab(MontoyaApi api, List<BaseRequest> baseRequests) {
         this.api = api;
@@ -126,6 +129,13 @@ public class BaseRequestsTab {
         });
 
         topPanel.add(colorSelector);
+
+        // Remove Authentication button
+        removeAuthButton = new JButton("Remove Authentication");
+        removeAuthButton.setToolTipText("Create a copy of the selected request with authentication removed (cookies, authorization headers, and aura.token)");
+        removeAuthButton.setEnabled(false); // Initially disabled
+        removeAuthButton.addActionListener(e -> removeAuthentication());
+        topPanel.add(removeAuthButton);
 
         return topPanel;
     }
@@ -367,6 +377,8 @@ public class BaseRequestsTab {
                 if (selectedRow >= 0 && selectedRow < baseRequests.size()) {
                     showRequestDetails(baseRequests.get(selectedRow));
                 }
+                // Update Remove Authentication button state - enable only when exactly 1 request is selected
+                removeAuthButton.setEnabled(requestTable.getSelectedRowCount() == 1);
             }
         });
     }
@@ -517,7 +529,60 @@ public class BaseRequestsTab {
         timer.setRepeats(false);
         timer.start();
     }
-    
+
+    /**
+     * Remove authentication from the selected request and add it as a new base request
+     */
+    private void removeAuthentication() {
+        int selectedRow = requestTable.getSelectedRow();
+        if (selectedRow < 0 || selectedRow >= baseRequests.size()) {
+            return;
+        }
+
+        BaseRequest selectedRequest = baseRequests.get(selectedRow);
+        HttpRequestResponse originalRequestResponse = selectedRequest.getRequestResponse();
+
+        try {
+            // Start with the original request
+            HttpRequest originalRequest = originalRequestResponse.request();
+
+            // Get the original body and modify aura.token
+            String originalBody = originalRequest.bodyToString();
+            String modifiedBody = originalBody;
+            if (originalBody.contains("aura.token=")) {
+                // Replace aura.token value with "undefined"
+                modifiedBody = originalBody.replaceAll("aura\\.token=[^&]*", "aura.token=undefined");
+            }
+
+            // Create modified request: remove headers and update body
+            HttpRequest modifiedRequest = originalRequest
+                .withBody(modifiedBody)
+                .withRemovedHeader("Cookie")
+                .withRemovedHeader("Authorization");
+
+            HttpRequestResponse modifiedRequestResponse = HttpRequestResponse.httpRequestResponse(
+                modifiedRequest,
+                originalRequestResponse.response()
+            );
+
+            // Create new base request with "Unauthenticated" note
+            BaseRequest newBaseRequest = new BaseRequest(modifiedRequestResponse, "Unauthenticated");
+            baseRequests.add(newBaseRequest);
+
+            // Refresh table and notify callback
+            tableModel.fireTableDataChanged();
+            if (onRequestsChangedCallback != null) {
+                onRequestsChangedCallback.run();
+            }
+
+            showNonBlockingMessage("Created unauthenticated copy of request: " + selectedRequest.getUrl(), "success");
+
+        } catch (Exception e) {
+            api.logging().logToError("Error removing authentication: " + e.getMessage());
+            showNonBlockingMessage("Error removing authentication: " + e.getMessage(), "error");
+        }
+    }
+
     /**
      * Table model for displaying base requests
      */
