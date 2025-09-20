@@ -614,7 +614,7 @@ public class ActionsTab {
      */
     private String generateDiscoverResultId(int requestId) {
         discoverResultCounter++;
-        return "Discover-Request" + requestId + "-" + discoverResultCounter;
+        return "Discovered Objects " + discoverResultCounter + " - Req " + requestId;
     }
     
     /**
