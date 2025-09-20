@@ -906,9 +906,28 @@ public class ActionsTab {
                         continue;
                     }
                     
+                    // Check for cancellation before parsing response
+                    if (operationCancelled || Thread.currentThread().isInterrupted()) {
+                        api.logging().logToOutput("Bulk object retrieval cancelled before parsing response");
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null; // Clear thread reference
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Operation cancelled - " + successfulObjects[0] + " objects retrieved", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Operation cancelled", Color.RED);
+                            }
+                        });
+                        return;
+                    }
+
                     // Parse the response to extract object data
                     String responseBody = response.response().bodyToString();
-                    
+
                     // Parse and immediately add to tab using a modified parseSpecificObjectResponse
                     parseBulkObjectResponseIncremental(responseBody, tabId, objectName, baseRequest.getId());
                     successfulObjects[0]++;
@@ -1084,6 +1103,25 @@ public class ActionsTab {
                     }
 
                     successfulObjects[0]++;
+
+                    // Check for cancellation before parsing response
+                    if (operationCancelled || Thread.currentThread().isInterrupted()) {
+                        api.logging().logToOutput("Wordlist scan cancelled before parsing response");
+                        SwingUtilities.invokeLater(() -> {
+                            clearBulkRetrievalState();
+                            currentOperationThread = null;
+
+                            // Create tab with whatever data was collected so far
+                            ObjectByNameResult tabResult = tabObjectResults.get(tabId);
+                            if (tabResult != null && !tabResult.getObjectEntries().isEmpty()) {
+                                resultTabCallback.createObjectByNameTab(tabId, tabResult);
+                                showStatusMessage("Wordlist scan cancelled - " + foundObjects[0] + " objects found", Color.ORANGE);
+                            } else {
+                                showStatusMessage("Wordlist scan cancelled", Color.RED);
+                            }
+                        });
+                        return;
+                    }
 
                     // Parse response and check if object exists
                     String responseBody = response.response().bodyToString();
