@@ -716,6 +716,11 @@ public class ActionsTab {
         if (hasExistingTabs) {
             switch (choice) {
                 case 0: // Append to existing tab
+                    // Load existing results from the tab to preserve contents
+                    ObjectByNameResult existingResults = tabObjectResults.get(lastTabId);
+                    if (existingResults != null) {
+                        objectByNameResults = existingResults; // Use existing results for appending
+                    }
                     return lastTabId;
                 case 1: // Create new tab
                     objectByNameResults = new ObjectByNameResult();
@@ -726,6 +731,7 @@ public class ActionsTab {
         } else {
             switch (choice) {
                 case 0: // Create new tab (only option)
+                    objectByNameResults = new ObjectByNameResult();
                     return generateRetrievedObjectsResultId();
                 default: // Cancel or close
                     return null;
