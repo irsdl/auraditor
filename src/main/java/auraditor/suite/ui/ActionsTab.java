@@ -2751,19 +2751,57 @@ public class ActionsTab {
                 String objectName = originalObjectModel.getElementAt(i);
                 boolean includeItem = true;
                 
-                // Apply text filter
+                // Apply text filter - search in both object name AND JSON content
                 if (!filterText.isEmpty()) {
                     if (filterRegexCheckBox.isSelected()) {
                         try {
-                            java.util.regex.Pattern pattern = SafeRegex.safeCompile(filterText, 
+                            java.util.regex.Pattern pattern = SafeRegex.safeCompile(filterText,
                                 java.util.regex.Pattern.CASE_INSENSITIVE);
-                            includeItem = SafeRegex.safeMatches(pattern, objectName);
+
+                            // Check object name first
+                            boolean matchesName = SafeRegex.safeMatches(pattern, objectName);
+
+                            // Check JSON content if name doesn't match
+                            boolean matchesContent = false;
+                            if (!matchesName) {
+                                String jsonData = objectByNameResult.getObjectData(objectName);
+                                if (jsonData != null && !jsonData.trim().isEmpty()) {
+                                    matchesContent = SafeRegex.safeMatches(pattern, jsonData);
+                                }
+                            }
+
+                            includeItem = matchesName || matchesContent;
                         } catch (Exception e) {
                             // If regex fails, fall back to plain text matching
-                            includeItem = objectName.toLowerCase().contains(filterText.toLowerCase());
+                            String lowerFilterText = filterText.toLowerCase();
+                            boolean matchesName = objectName.toLowerCase().contains(lowerFilterText);
+
+                            // Check JSON content if name doesn't match
+                            boolean matchesContent = false;
+                            if (!matchesName) {
+                                String jsonData = objectByNameResult.getObjectData(objectName);
+                                if (jsonData != null && !jsonData.trim().isEmpty()) {
+                                    matchesContent = jsonData.toLowerCase().contains(lowerFilterText);
+                                }
+                            }
+
+                            includeItem = matchesName || matchesContent;
                         }
                     } else {
-                        includeItem = objectName.toLowerCase().contains(filterText.toLowerCase());
+                        // Plain text search - search in both object name AND JSON content
+                        String lowerFilterText = filterText.toLowerCase();
+                        boolean matchesName = objectName.toLowerCase().contains(lowerFilterText);
+
+                        // Check JSON content if name doesn't match
+                        boolean matchesContent = false;
+                        if (!matchesName) {
+                            String jsonData = objectByNameResult.getObjectData(objectName);
+                            if (jsonData != null && !jsonData.trim().isEmpty()) {
+                                matchesContent = jsonData.toLowerCase().contains(lowerFilterText);
+                            }
+                        }
+
+                        includeItem = matchesName || matchesContent;
                     }
                 }
                 
