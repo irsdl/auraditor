@@ -249,7 +249,25 @@ public class AuraditorSuiteTab {
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         String timestamp = now.format(formatter);
-        addBaseRequest(requestResponse, "Added via context menu at " + timestamp);
+
+        // Try to find annotation color by searching proxy history for matching request
+        String notes = "Added via context menu at " + timestamp;
+        String requestUrl = requestResponse.request().url();
+
+        // Search proxy history for matching request to get annotation color
+        java.util.Optional<burp.api.montoya.proxy.ProxyHttpRequestResponse> matchingProxyRequest = api.proxy().history().stream()
+            .filter(proxyReq -> proxyReq.finalRequest().url().equals(requestUrl))
+            .findFirst();
+
+        if (matchingProxyRequest.isPresent()) {
+            burp.api.montoya.core.HighlightColor requestColor = matchingProxyRequest.get().annotations().highlightColor();
+            if (requestColor != null) {
+                notes += " [Color: " + requestColor.name().toLowerCase() + "]";
+            }
+        }
+
+        // Call the overloaded method with the complete notes
+        addBaseRequest(requestResponse, notes);
     }
     
     /**
