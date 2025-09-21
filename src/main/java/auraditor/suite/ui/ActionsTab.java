@@ -2378,33 +2378,232 @@ public class ActionsTab {
     }
     
     /**
+     * Base class for result panels with shared toolbar functionality
+     */
+    public static abstract class BaseResultPanel extends JPanel {
+        // Toolbar components
+        protected JTextField searchField;
+        protected JTextField filterField;
+        protected JCheckBox searchRegexCheckBox;
+        protected JCheckBox filterRegexCheckBox;
+        protected JCheckBox hideEmptyCheckBox;
+        protected JButton searchNextBtn;
+        protected JButton searchPrevBtn;
+        protected JButton resetBtn;
+        protected JButton exportBtn;
+        protected JLabel searchStatusLabel;
+
+        // Search state
+        protected int currentSearchIndex = -1;
+        protected List<Integer> searchMatches = new ArrayList<>();
+        protected String lastSearchText = "";
+
+        /**
+         * Create the shared toolbar with all common functionality
+         */
+        protected JPanel createSharedToolbar() {
+            JPanel toolbar = new JPanel(new BorderLayout());
+            toolbar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+            // Left panel: Export and Search controls
+            JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+
+            // Export button first
+            this.exportBtn = new JButton("Export");
+            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
+            searchPanel.add(exportBtn);
+
+            // Add separator
+            searchPanel.add(new javax.swing.JSeparator(javax.swing.SwingConstants.VERTICAL));
+
+            searchPanel.add(new JLabel("Search:"));
+
+            this.searchField = new JTextField(15);
+            searchPanel.add(searchField);
+
+            this.searchRegexCheckBox = new JCheckBox("Regex");
+            searchPanel.add(searchRegexCheckBox);
+
+            this.searchNextBtn = new JButton("Next");
+            this.searchPrevBtn = new JButton("Prev");
+            searchPanel.add(searchNextBtn);
+            searchPanel.add(searchPrevBtn);
+
+            this.searchStatusLabel = new JLabel(" ");
+            searchPanel.add(searchStatusLabel);
+
+            // Center panel: Filter controls
+            JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+            filterPanel.add(new JLabel("Filter:"));
+
+            this.filterField = new JTextField(15);
+            filterPanel.add(filterField);
+
+            this.filterRegexCheckBox = new JCheckBox("Regex");
+            filterPanel.add(filterRegexCheckBox);
+
+            this.hideEmptyCheckBox = new JCheckBox("Hide Empty");
+            filterPanel.add(hideEmptyCheckBox);
+
+            // Right panel: Reset button
+            JPanel resetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+            this.resetBtn = new JButton("Reset/Show All");
+            resetPanel.add(resetBtn);
+
+            // Add panels to toolbar
+            toolbar.add(searchPanel, BorderLayout.WEST);
+            toolbar.add(filterPanel, BorderLayout.CENTER);
+            toolbar.add(resetPanel, BorderLayout.EAST);
+
+            // Setup event handlers
+            setupSharedToolbarEventHandlers();
+
+            return toolbar;
+        }
+
+        /**
+         * Setup shared event handlers for toolbar components
+         */
+        protected void setupSharedToolbarEventHandlers() {
+            // Export button
+            exportBtn.addActionListener(e -> performExport());
+
+            // Search field - trigger search on Enter or text change with delay
+            searchField.addActionListener(e -> performSearch());
+
+            javax.swing.Timer searchTimer = new javax.swing.Timer(500, e -> {
+                if (!searchField.getText().equals(lastSearchText)) {
+                    performSearch();
+                }
+            });
+            searchTimer.setRepeats(false);
+
+            searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                @Override
+                public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
+                }
+                @Override
+                public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
+                }
+                @Override
+                public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
+                }
+            });
+
+            // Search navigation buttons
+            searchNextBtn.addActionListener(e -> navigateSearch(true));
+            searchPrevBtn.addActionListener(e -> navigateSearch(false));
+
+            // Search regex checkbox
+            searchRegexCheckBox.addActionListener(e -> performSearch());
+
+            // Filter field - trigger filter on text change with delay
+            javax.swing.Timer filterTimer = new javax.swing.Timer(300, e -> applyFilter());
+            filterTimer.setRepeats(false);
+
+            filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                @Override
+                public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                    filterTimer.restart();
+                }
+                @Override
+                public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                    filterTimer.restart();
+                }
+                @Override
+                public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                    filterTimer.restart();
+                }
+            });
+
+            // Filter regex checkbox
+            filterRegexCheckBox.addActionListener(e -> applyFilter());
+
+            // Hide empty checkbox
+            hideEmptyCheckBox.addActionListener(e -> applyFilter());
+
+            // Reset button
+            resetBtn.addActionListener(e -> resetAllFilters());
+        }
+
+        /**
+         * Shared search navigation logic
+         */
+        protected void navigateSearch(boolean next) {
+            if (searchMatches.isEmpty()) {
+                performSearch(); // Try to search if no matches yet
+                return;
+            }
+
+            if (next) {
+                currentSearchIndex = (currentSearchIndex + 1) % searchMatches.size();
+            } else {
+                currentSearchIndex = (currentSearchIndex - 1 + searchMatches.size()) % searchMatches.size();
+            }
+
+            highlightCurrentMatch();
+            updateSearchStatus((currentSearchIndex + 1) + " of " + searchMatches.size());
+        }
+
+        /**
+         * Update search status display
+         */
+        protected void updateSearchStatus(String status) {
+            searchStatusLabel.setText(status);
+        }
+
+        /**
+         * Clear search state
+         */
+        protected void clearSearch() {
+            searchMatches.clear();
+            currentSearchIndex = -1;
+            updateSearchStatus(" ");
+            // Clear any highlighting in the searchable component
+            clearSearchHighlighting();
+        }
+
+        /**
+         * Reset all filters and search
+         */
+        protected void resetAllFilters() {
+            filterField.setText("");
+            searchField.setText("");
+            hideEmptyCheckBox.setSelected(false);
+            clearSearch();
+            applyFilter();
+        }
+
+        /**
+         * Sanitize filename for cross-platform compatibility
+         */
+        protected String sanitizeFilename(String filename) {
+            if (filename == null) return "unknown";
+            return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
+        }
+
+        // Abstract methods that subclasses must implement
+        protected abstract void performSearch();
+        protected abstract void applyFilter();
+        protected abstract void performExport();
+        protected abstract void highlightCurrentMatch();
+        protected abstract void clearSearchHighlighting();
+    }
+
+    /**
      * Panel for displaying discovery results with categories menu and object list
      * Enhanced with search and filter functionality
      */
-    public static class DiscoveryResultPanel extends JPanel {
+    public static class DiscoveryResultPanel extends BaseResultPanel {
         private final DiscoveryResult discoveryResult;
         private final JList<String> categoryList;
         private final JTextArea objectListArea;
         private final JSplitPane splitPane;
-        
-        // Search and filter components
-        private JTextField searchField;
-        private JTextField filterField;
-        private JCheckBox searchRegexCheckBox;
-        private JCheckBox filterRegexCheckBox;
-        private JCheckBox hideEmptyCheckBox;
-        private JButton searchNextBtn;
-        private JButton searchPrevBtn;
-        private JButton resetBtn;
-        private JButton exportBtn;
-        private JLabel searchStatusLabel;
-        
-        // Search state
-        private int currentSearchIndex = -1;
-        private List<Integer> searchMatches = new ArrayList<>();
-        private String lastSearchText = "";
-        
-        // Filter state
+
+        // Filter state (specific to DiscoveryResultPanel)
         private DefaultListModel<String> originalCategoryModel;
         private DefaultListModel<String> filteredCategoryModel;
         private String[] originalCategories;
@@ -2428,9 +2627,9 @@ public class ActionsTab {
                 originalCategoryModel.addElement(category);
                 filteredCategoryModel.addElement(category);
             }
-            
+
             // Create toolbar with search and filter controls
-            JPanel toolbar = createToolbar();
+            JPanel toolbar = createSharedToolbar();
             this.add(toolbar, BorderLayout.NORTH);
             
             // Create category list (left panel)
@@ -2467,127 +2666,9 @@ public class ActionsTab {
             updateObjectList();
         }
         
-        private JPanel createToolbar() {
-            JPanel toolbar = new JPanel(new BorderLayout());
-            toolbar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-            
-            // Left panel: Search controls
-            JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-            searchPanel.add(new JLabel("Search:"));
-            
-            this.searchField = new JTextField(15);
-            searchPanel.add(searchField);
-            
-            this.searchRegexCheckBox = new JCheckBox("Regex");
-            searchPanel.add(searchRegexCheckBox);
-            
-            this.searchNextBtn = new JButton("Next");
-            this.searchPrevBtn = new JButton("Prev");
-            searchPanel.add(searchNextBtn);
-            searchPanel.add(searchPrevBtn);
-            
-            this.searchStatusLabel = new JLabel(" ");
-            searchPanel.add(searchStatusLabel);
-            
-            // Center panel: Filter controls
-            JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
-            filterPanel.add(new JLabel("Filter:"));
-            
-            this.filterField = new JTextField(15);
-            filterPanel.add(filterField);
-            
-            this.filterRegexCheckBox = new JCheckBox("Regex");
-            filterPanel.add(filterRegexCheckBox);
-            
-            this.hideEmptyCheckBox = new JCheckBox("Hide Empty");
-            filterPanel.add(hideEmptyCheckBox);
-            
-            // Right panel: Export and Reset buttons
-            JPanel resetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
-            this.exportBtn = new JButton("Export");
-            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
-            resetPanel.add(exportBtn);
-
-            this.resetBtn = new JButton("Reset/Show All");
-            resetPanel.add(resetBtn);
-            
-            // Add panels to toolbar
-            toolbar.add(searchPanel, BorderLayout.WEST);
-            toolbar.add(filterPanel, BorderLayout.CENTER);
-            toolbar.add(resetPanel, BorderLayout.EAST);
-            
-            // Add event listeners
-            setupToolbarEventHandlers();
-            
-            return toolbar;
-        }
         
-        private void setupToolbarEventHandlers() {
-            // Export button - export filtered results to files
-            exportBtn.addActionListener(e -> performExport());
-
-            // Search field - trigger search on Enter or text change with delay
-            searchField.addActionListener(e -> performSearch());
-            
-            javax.swing.Timer searchTimer = new javax.swing.Timer(500, e -> {
-                if (!searchField.getText().equals(lastSearchText)) {
-                    performSearch();
-                }
-            });
-            searchTimer.setRepeats(false);
-            
-            searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-                @Override
-                public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-                @Override
-                public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-                @Override
-                public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-            });
-            
-            // Search navigation buttons
-            searchNextBtn.addActionListener(e -> navigateSearch(true));
-            searchPrevBtn.addActionListener(e -> navigateSearch(false));
-            
-            // Search regex checkbox
-            searchRegexCheckBox.addActionListener(e -> performSearch());
-            
-            // Filter field - trigger filter on text change with delay
-            javax.swing.Timer filterTimer = new javax.swing.Timer(300, e -> applyFilter());
-            filterTimer.setRepeats(false);
-            
-            filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-                @Override
-                public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                    filterTimer.restart();
-                }
-                @Override
-                public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                    filterTimer.restart();
-                }
-                @Override
-                public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                    filterTimer.restart();
-                }
-            });
-            
-            // Filter regex checkbox
-            filterRegexCheckBox.addActionListener(e -> applyFilter());
-            
-            // Hide empty checkbox
-            hideEmptyCheckBox.addActionListener(e -> applyFilter());
-            
-            // Reset button
-            resetBtn.addActionListener(e -> resetAllFilters());
-        }
-        
-        private void performSearch() {
+        @Override
+        protected void performSearch() {
             String searchText = searchField.getText().trim();
             lastSearchText = searchText;
             
@@ -2656,24 +2737,10 @@ public class ActionsTab {
                 updateSearchStatus((currentSearchIndex + 1) + " of " + searchMatches.size());
             }
         }
-        
-        private void navigateSearch(boolean next) {
-            if (searchMatches.isEmpty()) {
-                performSearch(); // Try to search if no matches yet
-                return;
-            }
-            
-            if (next) {
-                currentSearchIndex = (currentSearchIndex + 1) % searchMatches.size();
-            } else {
-                currentSearchIndex = (currentSearchIndex - 1 + searchMatches.size()) % searchMatches.size();
-            }
-            
-            highlightCurrentMatch();
-            updateSearchStatus((currentSearchIndex + 1) + " of " + searchMatches.size());
-        }
-        
-        private void highlightCurrentMatch() {
+
+
+        @Override
+        protected void highlightCurrentMatch() {
             if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
                 int start = searchMatches.get(currentSearchIndex);
                 String searchText = searchField.getText();
@@ -2715,19 +2782,14 @@ public class ActionsTab {
             }
         }
         
-        private void clearSearch() {
-            searchMatches.clear();
-            currentSearchIndex = -1;
+        @Override
+        protected void clearSearchHighlighting() {
             objectListArea.setSelectionStart(0);
             objectListArea.setSelectionEnd(0);
-            updateSearchStatus(" ");
         }
-        
-        private void updateSearchStatus(String status) {
-            searchStatusLabel.setText(status);
-        }
-        
-        private void applyFilter() {
+
+        @Override
+        protected void applyFilter() {
             String filterText = filterField.getText().trim();
             boolean useRegex = filterRegexCheckBox.isSelected();
             boolean hideEmpty = hideEmptyCheckBox.isSelected();
@@ -2813,21 +2875,21 @@ public class ActionsTab {
             }
         }
         
-        private void resetAllFilters() {
-            searchField.setText("");
-            filterField.setText("");
-            hideEmptyCheckBox.setSelected(false);
-            
+        @Override
+        protected void resetAllFilters() {
+            // Call parent reset logic
+            super.resetAllFilters();
+
+            // DiscoveryResultPanel specific reset logic
             categoryList.setModel(originalCategoryModel);
             isFiltered = false;
-            resetBtn.setEnabled(false);
-            
+
             // Select first item
             if (originalCategoryModel.getSize() > 0) {
                 categoryList.setSelectedIndex(0);
             }
-            
-            clearSearch();
+
+            updateObjectList();
         }
         
         private void updateObjectList() {
@@ -2863,7 +2925,8 @@ public class ActionsTab {
         /**
          * Export filtered results to text files in a selected folder
          */
-        private void performExport() {
+        @Override
+        protected void performExport() {
             // Use filtered model to get currently visible categories
             DefaultListModel<String> modelToExport = filteredCategoryModel;
 
@@ -2985,7 +3048,7 @@ public class ActionsTab {
      * Panel for displaying object by name results with search/filter functionality
      * Similar style to DiscoveryResultPanel but shows object entries and their JSON data
      */
-    public static class ObjectByNameResultPanel extends JPanel {
+    public static class ObjectByNameResultPanel extends BaseResultPanel {
         private final ObjectByNameResult objectByNameResult;
         private final JList<String> objectList;
         private final JTextArea jsonDataArea;
@@ -2995,25 +3058,8 @@ public class ActionsTab {
 
         // Additional field to hold current data for updates
         private java.util.Map<String, String> currentObjectData;
-        
-        // Search and filter components
-        private JTextField searchField;
-        private JTextField filterField;
-        private JCheckBox searchRegexCheckBox;
-        private JCheckBox filterRegexCheckBox;
-        private JCheckBox hideEmptyCheckBox;
-        private JButton searchNextBtn;
-        private JButton searchPrevBtn;
-        private JButton resetBtn;
-        private JButton exportBtn;
-        private JLabel searchStatusLabel;
 
-        // Search state
-        private int currentSearchIndex = -1;
-        private List<Integer> searchMatches = new ArrayList<>();
-        private String lastSearchText = "";
-
-        // Filter state
+        // Filter state (specific to ObjectByNameResultPanel)
         private DefaultListModel<String> originalObjectModel;
         private DefaultListModel<String> filteredObjectModel;
         
@@ -3037,7 +3083,7 @@ public class ActionsTab {
             }
             
             // Create toolbar with search and filter controls
-            JPanel toolbar = createToolbar();
+            JPanel toolbar = createSharedToolbar();
             this.add(toolbar, BorderLayout.NORTH);
             
             // Create object list (left panel)
@@ -3194,18 +3240,6 @@ public class ActionsTab {
             objectList.addMouseListener(mouseAdapter);
         }
 
-        private JPanel createToolbar() {
-            JPanel toolbar = new JPanel(new BorderLayout());
-            toolbar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-
-            // Left panel: Export and Search controls
-            JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
-
-            // Export button first
-            this.exportBtn = new JButton("Export");
-            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
-            searchPanel.add(exportBtn);
-
             // Add separator
             searchPanel.add(new javax.swing.JSeparator(javax.swing.SwingConstants.VERTICAL));
 
@@ -3333,8 +3367,9 @@ public class ActionsTab {
                 jsonDataArea.setText("Select an object to view its data");
             }
         }
-        
-        private void performSearch() {
+
+        @Override
+        protected void performSearch() {
             String searchText = searchField.getText().trim();
             lastSearchText = searchText;
             
