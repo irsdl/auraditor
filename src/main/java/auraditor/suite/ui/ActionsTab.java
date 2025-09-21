@@ -2725,20 +2725,6 @@ public class ActionsTab {
             JScrollPane objectScrollPane = new JScrollPane(objectList);
             objectScrollPane.setPreferredSize(new Dimension(400, 0));
 
-            // Add debug logging for scroll pane
-            api.logging().logToOutput("Created JScrollPane for objectList");
-
-            // Also add a mouse listener to the scroll pane to debug
-            objectScrollPane.addMouseListener(new java.awt.event.MouseAdapter() {
-                @Override
-                public void mousePressed(java.awt.event.MouseEvent e) {
-                    api.logging().logToOutput("ScrollPane mouse pressed - button: " + e.getButton());
-                }
-                @Override
-                public void mouseReleased(java.awt.event.MouseEvent e) {
-                    api.logging().logToOutput("ScrollPane mouse released - button: " + e.getButton());
-                }
-            });
             
             JScrollPane jsonScrollPane = new JScrollPane(jsonDataArea);
             
@@ -2788,18 +2774,19 @@ public class ActionsTab {
          * Add mouse listener to object list for right-click context menu
          */
         private void addMouseListenerToObjectList() {
-            // Remove any existing mouse listeners to avoid duplicates
+            // Remove ALL existing mouse listeners to prevent interference
             java.awt.event.MouseListener[] existingListeners = objectList.getMouseListeners();
             for (java.awt.event.MouseListener listener : existingListeners) {
-                if (listener.getClass().getName().contains("ObjectByNameResultPanel")) {
-                    objectList.removeMouseListener(listener);
-                }
+                objectList.removeMouseListener(listener);
             }
 
-            // Add the mouse listener
+            // Add a single mouse listener that handles popup properly
             java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
                 @Override
                 public void mousePressed(java.awt.event.MouseEvent e) {
+                    // Handle selection on any click
+                    handleSelection(e);
+                    // Only show popup on popup trigger
                     if (e.isPopupTrigger()) {
                         showContextMenu(e);
                     }
@@ -2807,8 +2794,16 @@ public class ActionsTab {
 
                 @Override
                 public void mouseReleased(java.awt.event.MouseEvent e) {
+                    // Only show popup on popup trigger (for Mac compatibility)
                     if (e.isPopupTrigger()) {
                         showContextMenu(e);
+                    }
+                }
+
+                private void handleSelection(java.awt.event.MouseEvent e) {
+                    int index = objectList.locationToIndex(e.getPoint());
+                    if (index >= 0 && index < objectList.getModel().getSize()) {
+                        objectList.setSelectedIndex(index);
                     }
                 }
 
@@ -2816,7 +2811,10 @@ public class ActionsTab {
                     int index = objectList.locationToIndex(e.getPoint());
 
                     if (index >= 0 && index < objectList.getModel().getSize()) {
-                        objectList.setSelectedIndex(index);
+                        // Ensure item is selected (may already be selected from handleSelection)
+                        if (objectList.getSelectedIndex() != index) {
+                            objectList.setSelectedIndex(index);
+                        }
                         String selectedValue = objectList.getSelectedValue();
 
                         javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
