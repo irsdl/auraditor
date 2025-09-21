@@ -27,10 +27,12 @@ public class AuraditorSuiteTab {
     private final ActionsTab actionsTab;
     private final List<BaseRequest> baseRequests;
     private final JTabbedPane resultsTabbedPane;
+    private final java.util.Map<String, ActionsTab.ObjectByNameResultPanel> existingObjectPanels;
     
     public AuraditorSuiteTab(MontoyaApi api) {
         this.api = api;
         this.baseRequests = new ArrayList<>();
+        this.existingObjectPanels = new java.util.HashMap<>();
         
         // Create main panel
         this.mainPanel = new JPanel(new BorderLayout());
@@ -172,16 +174,26 @@ public class AuraditorSuiteTab {
                     break;
                 }
             }
-            
-            // Create object by name result panel
-            ActionsTab.ObjectByNameResultPanel objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult);
-            
+
+            ActionsTab.ObjectByNameResultPanel objectByNamePanel;
+
             if (existingTabIndex >= 0) {
-                // Update existing tab
-                resultsTabbedPane.setComponentAt(existingTabIndex, objectByNamePanel);
+                // Tab exists - check if we have an existing panel to update
+                objectByNamePanel = existingObjectPanels.get(resultId);
+                if (objectByNamePanel != null) {
+                    // Update existing panel instead of recreating
+                    objectByNamePanel.updateWithNewData(objectByNameResult);
+                } else {
+                    // Create new panel (shouldn't happen, but safety fallback)
+                    objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult, baseRequests, api);
+                    existingObjectPanels.put(resultId, objectByNamePanel);
+                    resultsTabbedPane.setComponentAt(existingTabIndex, objectByNamePanel);
+                }
                 resultsTabbedPane.setSelectedIndex(existingTabIndex);
             } else {
-                // Add new tab
+                // Create new tab and panel
+                objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult, baseRequests, api);
+                existingObjectPanels.put(resultId, objectByNamePanel);
                 resultsTabbedPane.addTab(resultId, objectByNamePanel);
                 resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
             }
@@ -210,16 +222,26 @@ public class AuraditorSuiteTab {
                     break;
                 }
             }
-            
-            // Create object by name result panel
-            ActionsTab.ObjectByNameResultPanel objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult);
-            
+
+            ActionsTab.ObjectByNameResultPanel objectByNamePanel;
+
             if (existingTabIndex >= 0) {
-                // Update existing tab without switching
-                resultsTabbedPane.setComponentAt(existingTabIndex, objectByNamePanel);
+                // Tab exists - check if we have an existing panel to update
+                objectByNamePanel = existingObjectPanels.get(resultId);
+                if (objectByNamePanel != null) {
+                    // Update existing panel instead of recreating
+                    objectByNamePanel.updateWithNewData(objectByNameResult);
+                } else {
+                    // Create new panel (shouldn't happen, but safety fallback)
+                    objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult, baseRequests, api);
+                    existingObjectPanels.put(resultId, objectByNamePanel);
+                    resultsTabbedPane.setComponentAt(existingTabIndex, objectByNamePanel);
+                }
                 // Don't call setSelectedIndex to avoid automatic switching
             } else {
-                // Add new tab without switching
+                // Create new tab and panel without switching
+                objectByNamePanel = new ActionsTab.ObjectByNameResultPanel(objectByNameResult, baseRequests, api);
+                existingObjectPanels.put(resultId, objectByNamePanel);
                 resultsTabbedPane.addTab(resultId, objectByNamePanel);
                 // Don't call setSelectedIndex to avoid automatic switching
             }

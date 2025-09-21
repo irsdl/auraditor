@@ -520,26 +520,34 @@ public class ActionsTab {
         isProcessing = true;
         currentActiveButton = activeButton;
         originalButtonText = activeButton.getText();
-        
+
         // Update active button to show it's working
         activeButton.setText("⟳ " + originalButtonText);
         activeButton.setEnabled(false);
-        
-        // Disable all other action buttons
+
+        // Disable all action buttons
         findAllObjectNamesBtn.setEnabled(false);
         findDefaultObjectsBtn.setEnabled(false);
         findCustomObjectsBtn.setEnabled(false);
         findAllObjectsBtn.setEnabled(false);
         findObjectByNameBtn.setEnabled(false);
         findDefaultObjectsPresetBtn.setEnabled(false);
-        
+
+        // Disable all input controls
+        requestSelector.setEnabled(false);
+        objectNameField.setEnabled(false);
+        threadCountSpinner.setEnabled(false);
+        discoveryResultSelector.setEnabled(false);
+        usePresetWordlistCheckbox.setEnabled(false);
+        selectWordlistBtn.setEnabled(false);
+
         // Show busy status and cancel button
         showStatusMessage("⟳ " + operationName + " in progress...", Color.BLUE);
         cancelBtn.setVisible(true);
-        
+
         // Hide progress for non-bulk operations
         progressLabel.setVisible(false);
-        
+
         statusPanel.revalidate();
         statusPanel.repaint();
     }
@@ -745,9 +753,11 @@ public class ActionsTab {
     private void addDiscoveryResult(String resultId) {
         availableDiscoveryResults.add(resultId);
         discoveryResultSelector.addItem(resultId);
-        
-        // Enable discovery result selector and select the new item
-        discoveryResultSelector.setEnabled(true);
+
+        // Only enable discovery result selector if not currently processing
+        if (!isProcessing) {
+            discoveryResultSelector.setEnabled(true);
+        }
         discoveryResultSelector.setSelectedIndex(discoveryResultSelector.getItemCount() - 1);
     }
     
@@ -1557,7 +1567,8 @@ public class ActionsTab {
                 }
                 jsonData = jsonContent.toString();
             }
-            
+
+
             // Add the object entry to the tab's ObjectByNameResult (like other operations)
             SwingUtilities.invokeLater(() -> {
                 // Initialize the ObjectByNameResult for this tab (or use existing if appending)
@@ -1568,10 +1579,14 @@ public class ActionsTab {
 
                 // Add entry to the tab's results
                 ObjectByNameResult tabResult = tabObjectResults.get(resultId);
+                api.logging().logToOutput("TabResult from tabObjectResults: " + (tabResult != null ? "not null" : "NULL"));
                 if (tabResult != null) {
                     tabResult.addObjectEntry(objectEntryName, jsonData);
                     // Update the tab content
+                    api.logging().logToOutput("About to call resultTabCallback.createObjectByNameTab - resultId: " + resultId);
+                    api.logging().logToOutput("TabResult object entries: " + tabResult.getObjectEntries().size());
                     resultTabCallback.createObjectByNameTab(resultId, tabResult);
+                    api.logging().logToOutput("Called resultTabCallback.createObjectByNameTab successfully");
                 }
 
                 clearBusyState();
@@ -2070,8 +2085,12 @@ public class ActionsTab {
         // Other UI elements
         objectNameField.setEnabled(hasRequests);
         requestSelector.setEnabled(hasRequests);
+        threadCountSpinner.setEnabled(hasRequests);
         usePresetWordlistCheckbox.setEnabled(hasRequests);
         selectWordlistBtn.setEnabled(hasRequests && !usePresetWordlistCheckbox.isSelected());
+
+        // Discovery result selector depends on having discovery results
+        discoveryResultSelector.setEnabled(hasRequests && hasDiscoveryResults);
         
         if (!hasRequests) {
             // Show persistent error message when no requests are available
@@ -2608,6 +2627,11 @@ public class ActionsTab {
         private final JList<String> objectList;
         private final JTextArea jsonDataArea;
         private final JSplitPane splitPane;
+        private final List<BaseRequest> baseRequests;
+        private final MontoyaApi api;
+
+        // Additional field to hold current data for updates
+        private java.util.Map<String, String> currentObjectData;
         
         // Search and filter components
         private JTextField searchField;
@@ -2629,8 +2653,13 @@ public class ActionsTab {
         private DefaultListModel<String> originalObjectModel;
         private DefaultListModel<String> filteredObjectModel;
         
-        public ObjectByNameResultPanel(ObjectByNameResult objectByNameResult) {
+        public ObjectByNameResultPanel(ObjectByNameResult objectByNameResult, List<BaseRequest> baseRequests, MontoyaApi api) {
             this.objectByNameResult = objectByNameResult;
+            this.baseRequests = baseRequests;
+            this.api = api;
+
+            // Initialize current object data with initial data
+            this.currentObjectData = new java.util.HashMap<>(objectByNameResult.getObjectEntries());
             this.setLayout(new BorderLayout());
             
             // Initialize list models
@@ -2666,10 +2695,27 @@ public class ActionsTab {
                     clearSearch(); // Clear search when changing selection
                 }
             });
+
+            // Right-click context menu will be added via SwingUtilities.invokeLater
             
             // Create split pane
             JScrollPane objectScrollPane = new JScrollPane(objectList);
             objectScrollPane.setPreferredSize(new Dimension(400, 0));
+
+            // Add debug logging for scroll pane
+            api.logging().logToOutput("Created JScrollPane for objectList");
+
+            // Also add a mouse listener to the scroll pane to debug
+            objectScrollPane.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    api.logging().logToOutput("ScrollPane mouse pressed - button: " + e.getButton());
+                }
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    api.logging().logToOutput("ScrollPane mouse released - button: " + e.getButton());
+                }
+            });
             
             JScrollPane jsonScrollPane = new JScrollPane(jsonDataArea);
             
@@ -2681,6 +2727,102 @@ public class ActionsTab {
             
             // Initialize with first object selected
             updateJsonData();
+
+            // Add mouse listener for right-click context menu
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                addMouseListenerToObjectList();
+            });
+        }
+
+        /**
+         * Update the panel with new data without recreating the entire panel
+         */
+        public void updateWithNewData(ObjectByNameResult newObjectByNameResult) {
+            // Clear existing models
+            originalObjectModel.clear();
+            filteredObjectModel.clear();
+
+            // Update current object data
+            currentObjectData.clear();
+            currentObjectData.putAll(newObjectByNameResult.getObjectEntries());
+
+            // Populate with new object entries
+            for (String objectName : newObjectByNameResult.getObjectNames()) {
+                originalObjectModel.addElement(objectName);
+                filteredObjectModel.addElement(objectName);
+            }
+
+            // Reset selection
+            if (originalObjectModel.getSize() > 0) {
+                objectList.setSelectedIndex(0);
+            }
+
+            // Update JSON data
+            updateJsonData();
+        }
+
+        /**
+         * Add mouse listener to object list for right-click context menu
+         */
+        private void addMouseListenerToObjectList() {
+            // Remove any existing mouse listeners to avoid duplicates
+            java.awt.event.MouseListener[] existingListeners = objectList.getMouseListeners();
+            for (java.awt.event.MouseListener listener : existingListeners) {
+                if (listener.getClass().getName().contains("ObjectByNameResultPanel")) {
+                    objectList.removeMouseListener(listener);
+                }
+            }
+
+            // Add the mouse listener
+            java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    handleMouseEvent(e);
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    handleMouseEvent(e);
+                }
+
+                private void handleMouseEvent(java.awt.event.MouseEvent e) {
+                    // Try multiple ways to detect right-click
+                    boolean isRightClick = e.isPopupTrigger() ||
+                                         javax.swing.SwingUtilities.isRightMouseButton(e) ||
+                                         e.getButton() == java.awt.event.MouseEvent.BUTTON3;
+
+                    if (isRightClick) {
+                        showContextMenu(e);
+                    }
+                }
+
+                private void showContextMenu(java.awt.event.MouseEvent e) {
+                    int index = objectList.locationToIndex(e.getPoint());
+
+                    if (index >= 0 && index < objectList.getModel().getSize()) {
+                        objectList.setSelectedIndex(index);
+                        String selectedValue = objectList.getSelectedValue();
+
+                        javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+
+                        javax.swing.JMenuItem showRequestItem = new javax.swing.JMenuItem("Show HTTP Request");
+                        showRequestItem.addActionListener(action -> showHttpRequest());
+                        popup.add(showRequestItem);
+
+                        javax.swing.JMenuItem sendToRepeaterItem = new javax.swing.JMenuItem("Send to Repeater");
+                        sendToRepeaterItem.addActionListener(action -> sendSelectedToRepeater());
+                        popup.add(sendToRepeaterItem);
+
+                        javax.swing.JMenuItem copyRequestItem = new javax.swing.JMenuItem("Copy HTTP Request");
+                        copyRequestItem.addActionListener(action -> copyHttpRequestToClipboard());
+                        popup.add(copyRequestItem);
+
+                        popup.show(objectList, e.getX(), e.getY());
+                    }
+                }
+            };
+
+            objectList.addMouseListener(mouseAdapter);
         }
         
         private JPanel createToolbar() {
@@ -2799,7 +2941,7 @@ public class ActionsTab {
         private void updateJsonData() {
             String selectedObject = objectList.getSelectedValue();
             if (selectedObject != null) {
-                String jsonData = objectByNameResult.getObjectData(selectedObject);
+                String jsonData = currentObjectData.get(selectedObject);
                 jsonDataArea.setText(jsonData != null ? jsonData : "No data available");
                 jsonDataArea.setCaretPosition(0); // Scroll to top
             } else {
@@ -3045,5 +3187,317 @@ public class ActionsTab {
             
             return false;
         }
+
+        /**
+         * Show the HTTP request for the currently selected object entry
+         */
+        private void showHttpRequest() {
+            String selectedObject = objectList.getSelectedValue();
+            if (selectedObject == null) {
+                return;
+            }
+
+            // Extract request ID from object name format: "ObjectName Object (requestID-timestamp)"
+            String requestId = extractRequestId(selectedObject);
+            if (requestId == null) {
+                api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Could not extract request ID from object name",
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            BaseRequest matchingRequest = findBaseRequestById(requestId);
+            if (matchingRequest == null) {
+                return;
+            }
+
+            // Display the HTTP request in a new dialog
+            displayHttpRequestDialog(matchingRequest, selectedObject);
+        }
+
+        /**
+         * Send the currently selected object's request to Repeater directly
+         */
+        private void sendSelectedToRepeater() {
+            String selectedObject = objectList.getSelectedValue();
+            if (selectedObject == null) {
+                return;
+            }
+
+            String requestId = extractRequestId(selectedObject);
+            if (requestId == null) {
+                api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Could not extract request ID from object name",
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            BaseRequest matchingRequest = findBaseRequestById(requestId);
+            if (matchingRequest == null) {
+                return;
+            }
+
+            // Reconstruct the actual object retrieval request
+            burp.api.montoya.http.message.requests.HttpRequest reconstructedRequest = reconstructObjectRetrievalRequest(matchingRequest, selectedObject);
+            sendToRepeater(reconstructedRequest, matchingRequest.getId());
+        }
+
+        /**
+         * Copy the currently selected object's HTTP request to clipboard
+         */
+        private void copyHttpRequestToClipboard() {
+            String selectedObject = objectList.getSelectedValue();
+            if (selectedObject == null) {
+                return;
+            }
+
+            String requestId = extractRequestId(selectedObject);
+            if (requestId == null) {
+                api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Could not extract request ID from object name",
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            BaseRequest matchingRequest = findBaseRequestById(requestId);
+            if (matchingRequest == null) {
+                return;
+            }
+
+            // Reconstruct the actual object retrieval request and format as proper HTTP request
+            burp.api.montoya.http.message.requests.HttpRequest reconstructedRequest = reconstructObjectRetrievalRequest(matchingRequest, selectedObject);
+            String requestText = formatAsHttpRequest(reconstructedRequest);
+
+            // Copy to clipboard
+            try {
+                java.awt.datatransfer.StringSelection stringSelection = new java.awt.datatransfer.StringSelection(requestText);
+                java.awt.datatransfer.Clipboard clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
+                clipboard.setContents(stringSelection, null);
+
+                api.logging().logToOutput("HTTP request copied to clipboard for: " + selectedObject);
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "HTTP request copied to clipboard!",
+                    "Success",
+                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                api.logging().logToError("Failed to copy request to clipboard: " + e.getMessage());
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Failed to copy request to clipboard: " + e.getMessage(),
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        /**
+         * Extract request ID from object name format: "ObjectName Object (requestID-timestamp)"
+         */
+        private String extractRequestId(String objectName) {
+            try {
+                // Look for pattern "(requestX-" where X is the ID
+                int startIndex = objectName.indexOf("(request");
+                if (startIndex == -1) {
+                    return null;
+                }
+
+                startIndex += "(request".length();
+                int endIndex = objectName.indexOf("-", startIndex);
+                if (endIndex == -1) {
+                    return null;
+                }
+
+                return objectName.substring(startIndex, endIndex);
+            } catch (Exception e) {
+                api.logging().logToError("Error extracting request ID from: " + objectName + " - " + e.getMessage());
+                return null;
+            }
+        }
+
+        /**
+         * Helper method to find BaseRequest by ID
+         */
+        private BaseRequest findBaseRequestById(String requestId) {
+            try {
+                int id = Integer.parseInt(requestId);
+                for (BaseRequest request : baseRequests) {
+                    if (request.getId() == id) {
+                        return request;
+                    }
+                }
+            } catch (NumberFormatException e) {
+                api.logging().logToError("Invalid request ID format: " + requestId);
+            }
+
+            api.logging().logToError("Could not find BaseRequest with ID: " + requestId);
+            javax.swing.JOptionPane.showMessageDialog(this,
+                "Could not find original request with ID: " + requestId,
+                "Error",
+                javax.swing.JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+
+        /**
+         * Reconstruct the actual HTTP request that was sent to retrieve the specific object
+         */
+        private burp.api.montoya.http.message.requests.HttpRequest reconstructObjectRetrievalRequest(BaseRequest baseRequest, String objectName) {
+            // Extract the actual object name from the object entry name
+            // Format: "ObjectName Object (requestX-timestamp)" -> "ObjectName"
+            String actualObjectName = objectName;
+            if (objectName.contains(" Object (")) {
+                actualObjectName = objectName.substring(0, objectName.indexOf(" Object ("));
+            }
+
+            api.logging().logToOutput("Reconstructing request for object: '" + actualObjectName + "' from entry: '" + objectName + "'");
+
+            // Get the original HTTP request
+            burp.api.montoya.http.message.requests.HttpRequest originalRequest = baseRequest.getRequestResponse().request();
+
+            // Create the object retrieval payload using the same template as other operations
+            // Need to escape the object name like in the bulk operations
+            String escapedObjectName = actualObjectName.replace("\\", "\\\\").replace("\"", "\\\"");
+            String objectRetrievalPayload = String.format(SPECIFIC_OBJECT_PAYLOAD_TEMPLATE, escapedObjectName);
+
+            // Build new request with modified message parameter
+            String newBody = "message=" + java.net.URLEncoder.encode(objectRetrievalPayload, java.nio.charset.StandardCharsets.UTF_8) + "&aura.context=" + extractAuraContext(originalRequest.bodyToString()) + "&aura.token=" + extractAuraToken(originalRequest.bodyToString());
+
+            // Create the modified HTTP request
+            return originalRequest.withBody(newBody);
+        }
+
+        /**
+         * Extract aura.context from the original request body
+         */
+        private String extractAuraContext(String requestBody) {
+            try {
+                String[] params = requestBody.split("&");
+                for (String param : params) {
+                    if (param.startsWith("aura.context=")) {
+                        return param.substring("aura.context=".length());
+                    }
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Failed to extract aura.context: " + e.getMessage());
+            }
+            return "";
+        }
+
+        /**
+         * Extract aura.token from the original request body
+         */
+        private String extractAuraToken(String requestBody) {
+            try {
+                String[] params = requestBody.split("&");
+                for (String param : params) {
+                    if (param.startsWith("aura.token=")) {
+                        return param.substring("aura.token=".length());
+                    }
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Failed to extract aura.token: " + e.getMessage());
+            }
+            return "";
+        }
+
+        /**
+         * Format HTTP request as a proper HTTP request string
+         */
+        private String formatAsHttpRequest(burp.api.montoya.http.message.requests.HttpRequest httpRequest) {
+            StringBuilder requestText = new StringBuilder();
+
+            // Request line: METHOD path HTTP/1.1
+            String url = httpRequest.url();
+            String path = url.substring(url.indexOf('/', 8)); // Remove protocol and host
+            requestText.append(httpRequest.method()).append(" ").append(path).append(" HTTP/1.1\r\n");
+
+            // Headers
+            for (burp.api.montoya.http.message.HttpHeader header : httpRequest.headers()) {
+                requestText.append(header.name()).append(": ").append(header.value()).append("\r\n");
+            }
+
+            // Empty line between headers and body
+            requestText.append("\r\n");
+
+            // Body
+            if (httpRequest.body().length() > 0) {
+                requestText.append(httpRequest.bodyToString());
+            }
+
+            return requestText.toString();
+        }
+
+        /**
+         * Display the HTTP request in a dialog window
+         */
+        private void displayHttpRequestDialog(BaseRequest baseRequest, String objectName) {
+            javax.swing.JDialog dialog = new javax.swing.JDialog((java.awt.Frame) null, "HTTP Request for " + objectName, true);
+            dialog.setDefaultCloseOperation(javax.swing.JDialog.DISPOSE_ON_CLOSE);
+            dialog.setSize(800, 600);
+            dialog.setLocationRelativeTo(this);
+
+            // Create text area for HTTP request
+            javax.swing.JTextArea requestArea = new javax.swing.JTextArea();
+            requestArea.setEditable(false);
+            requestArea.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12));
+
+            // Reconstruct the actual object retrieval request and format as proper HTTP request
+            burp.api.montoya.http.message.requests.HttpRequest reconstructedRequest = reconstructObjectRetrievalRequest(baseRequest, objectName);
+            String formattedRequest = formatAsHttpRequest(reconstructedRequest);
+
+            requestArea.setText(formattedRequest);
+            requestArea.setCaretPosition(0);
+
+            // Add scroll pane
+            javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(requestArea);
+
+            // Add buttons panel
+            javax.swing.JPanel buttonPanel = new javax.swing.JPanel(new java.awt.FlowLayout());
+
+            javax.swing.JButton sendToRepeaterBtn = new javax.swing.JButton("Send to Repeater");
+            sendToRepeaterBtn.addActionListener(e -> {
+                sendToRepeater(reconstructedRequest, baseRequest.getId());
+                dialog.dispose();
+            });
+
+            javax.swing.JButton closeBtn = new javax.swing.JButton("Close");
+            closeBtn.addActionListener(e -> dialog.dispose());
+
+            buttonPanel.add(sendToRepeaterBtn);
+            buttonPanel.add(closeBtn);
+
+            dialog.setLayout(new java.awt.BorderLayout());
+            dialog.add(scrollPane, java.awt.BorderLayout.CENTER);
+            dialog.add(buttonPanel, java.awt.BorderLayout.SOUTH);
+
+            dialog.setVisible(true);
+        }
+
+        /**
+         * Send the HTTP request to Burp's Repeater tool
+         */
+        private void sendToRepeater(burp.api.montoya.http.message.requests.HttpRequest httpRequest, int requestId) {
+            try {
+                // Send to repeater
+                api.repeater().sendToRepeater(httpRequest, "Auraditor - " + requestId);
+
+                api.logging().logToOutput("Sent request " + requestId + " to Repeater");
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Request sent to Repeater successfully!",
+                    "Success",
+                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+
+            } catch (Exception e) {
+                api.logging().logToError("Failed to send request to Repeater: " + e.getMessage());
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Failed to send request to Repeater: " + e.getMessage(),
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
     }
 }
