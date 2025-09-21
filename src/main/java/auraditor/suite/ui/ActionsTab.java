@@ -3088,6 +3088,10 @@ public class ActionsTab {
          * Update the panel with new data without recreating the entire panel
          */
         public void updateWithNewData(ObjectByNameResult newObjectByNameResult) {
+            // Store current filter state
+            String currentFilterText = filterField.getText().trim();
+            boolean hasActiveFilter = !currentFilterText.isEmpty() || hideEmptyCheckBox.isSelected();
+
             // Clear existing models
             originalObjectModel.clear();
             filteredObjectModel.clear();
@@ -3096,10 +3100,20 @@ public class ActionsTab {
             currentObjectData.clear();
             currentObjectData.putAll(newObjectByNameResult.getObjectEntries());
 
-            // Populate with new object entries
+            // Populate with new object entries (add to original model only)
             for (String objectName : newObjectByNameResult.getObjectNames()) {
                 originalObjectModel.addElement(objectName);
-                filteredObjectModel.addElement(objectName);
+            }
+
+            // Re-apply existing filter if there was one, otherwise show all items
+            if (hasActiveFilter) {
+                applyFilter(); // This will populate filteredObjectModel based on current filter criteria
+            } else {
+                // No filter was active, so copy all items to filtered model
+                for (String objectName : newObjectByNameResult.getObjectNames()) {
+                    filteredObjectModel.addElement(objectName);
+                }
+                objectList.setModel(originalObjectModel); // Use original model when no filter
             }
 
             // Reset selection
