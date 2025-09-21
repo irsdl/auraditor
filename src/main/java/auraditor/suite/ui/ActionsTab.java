@@ -3310,12 +3310,6 @@ public class ActionsTab {
                 clipboard.setContents(stringSelection, null);
 
                 api.logging().logToOutput("HTTP request copied to clipboard for: " + selectedObject);
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(this,
-                        "HTTP request copied to clipboard!",
-                        "Success",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy request to clipboard: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {
@@ -3520,12 +3514,6 @@ public class ActionsTab {
                 api.repeater().sendToRepeater(httpRequest, "Auraditor - " + requestId);
 
                 api.logging().logToOutput("Sent request " + requestId + " to Repeater");
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(this,
-                        "Request sent to Repeater successfully!",
-                        "Success",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
 
             } catch (Exception e) {
                 api.logging().logToError("Failed to send request to Repeater: " + e.getMessage());
