@@ -3201,10 +3201,12 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Could not extract request ID from object name",
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Could not extract request ID from object name",
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
                 return;
             }
 
@@ -3229,10 +3231,12 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Could not extract request ID from object name",
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Could not extract request ID from object name",
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
                 return;
             }
 
@@ -3258,10 +3262,12 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Could not extract request ID from object name",
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Could not extract request ID from object name",
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
                 return;
             }
 
@@ -3281,16 +3287,20 @@ public class ActionsTab {
                 clipboard.setContents(stringSelection, null);
 
                 api.logging().logToOutput("HTTP request copied to clipboard for: " + selectedObject);
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "HTTP request copied to clipboard!",
-                    "Success",
-                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "HTTP request copied to clipboard!",
+                        "Success",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy request to clipboard: " + e.getMessage());
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Failed to copy request to clipboard: " + e.getMessage(),
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Failed to copy request to clipboard: " + e.getMessage(),
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
             }
         }
 
@@ -3334,10 +3344,12 @@ public class ActionsTab {
             }
 
             api.logging().logToError("Could not find BaseRequest with ID: " + requestId);
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "Could not find original request with ID: " + requestId,
-                "Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                javax.swing.JOptionPane.showMessageDialog(this,
+                    "Could not find original request with ID: " + requestId,
+                    "Error",
+                    javax.swing.JOptionPane.ERROR_MESSAGE);
+            });
             return null;
         }
 
@@ -3485,17 +3497,21 @@ public class ActionsTab {
                 api.repeater().sendToRepeater(httpRequest, "Auraditor - " + requestId);
 
                 api.logging().logToOutput("Sent request " + requestId + " to Repeater");
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Request sent to Repeater successfully!",
-                    "Success",
-                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Request sent to Repeater successfully!",
+                        "Success",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
 
             } catch (Exception e) {
                 api.logging().logToError("Failed to send request to Repeater: " + e.getMessage());
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Failed to send request to Repeater: " + e.getMessage(),
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Failed to send request to Repeater: " + e.getMessage(),
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
             }
         }
 

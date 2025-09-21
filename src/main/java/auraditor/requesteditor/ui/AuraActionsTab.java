@@ -412,12 +412,14 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
                 hasAnyErrors = true;
                 // Only show error dialog once per invalid JSON state
                 if (!errorDialogShown) {
-                    JOptionPane.showMessageDialog(this.pane, 
-                        "Invalid JSON detected in one of the Aura Actions.\n" +
-                        "Please fix the JSON syntax to send the updated request.\n" +
-                        "Using original payload for now.",
-                        "JSON Syntax Error",
-                        JOptionPane.WARNING_MESSAGE);
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this.pane,
+                            "Invalid JSON detected in one of the Aura Actions.\n" +
+                            "Please fix the JSON syntax to send the updated request.\n" +
+                            "Using original payload for now.",
+                            "JSON Syntax Error",
+                            JOptionPane.WARNING_MESSAGE);
+                    });
                     errorDialogShown = true;
                 }
                 api.logging().logToError("Invalid JSON entered, using original payload: " + e.getMessage());
