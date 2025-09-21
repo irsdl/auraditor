@@ -2800,21 +2800,14 @@ public class ActionsTab {
             java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
                 @Override
                 public void mousePressed(java.awt.event.MouseEvent e) {
-                    handleMouseEvent(e);
+                    if (e.isPopupTrigger()) {
+                        showContextMenu(e);
+                    }
                 }
 
                 @Override
                 public void mouseReleased(java.awt.event.MouseEvent e) {
-                    handleMouseEvent(e);
-                }
-
-                private void handleMouseEvent(java.awt.event.MouseEvent e) {
-                    // Try multiple ways to detect right-click
-                    boolean isRightClick = e.isPopupTrigger() ||
-                                         javax.swing.SwingUtilities.isRightMouseButton(e) ||
-                                         e.getButton() == java.awt.event.MouseEvent.BUTTON3;
-
-                    if (isRightClick) {
+                    if (e.isPopupTrigger()) {
                         showContextMenu(e);
                     }
                 }
