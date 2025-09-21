@@ -245,6 +245,7 @@ public class ActionsTab {
     private final JButton findDefaultObjectsPresetBtn;
     private final JButton selectWordlistBtn;
     private final JCheckBox usePresetWordlistCheckbox;
+    private final JCheckBox alwaysCreateNewTabCheckbox;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
     private final JPanel statusPanel;
@@ -306,6 +307,7 @@ public class ActionsTab {
         this.findDefaultObjectsPresetBtn = new JButton("Scan with Wordlist");
         this.selectWordlistBtn = new JButton("Choose File...");
         this.usePresetWordlistCheckbox = new JCheckBox("Use built-in wordlist", true);
+        this.alwaysCreateNewTabCheckbox = new JCheckBox("Always create new tab", false);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
         
@@ -430,7 +432,14 @@ public class ActionsTab {
         threadPanel.add(threadCountSpinner);
         threadPanel.add(new JLabel("(reduces server load with lower values)"));
         actionsPanel.add(threadPanel, gbc);
-        
+
+        // Tab preference configuration
+        gbc.gridy++; gbc.gridwidth = 2; gbc.weighty = 0.0;
+        JPanel tabPreferencePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        alwaysCreateNewTabCheckbox.setToolTipText("Skip tab choice dialog and always create new tabs for object results");
+        tabPreferencePanel.add(alwaysCreateNewTabCheckbox);
+        actionsPanel.add(tabPreferencePanel, gbc);
+
         // Add some spacing at the bottom
         gbc.gridy++; gbc.weighty = 1.0;
         actionsPanel.add(Box.createVerticalGlue(), gbc);
@@ -540,6 +549,7 @@ public class ActionsTab {
         discoveryResultSelector.setEnabled(false);
         usePresetWordlistCheckbox.setEnabled(false);
         selectWordlistBtn.setEnabled(false);
+        alwaysCreateNewTabCheckbox.setEnabled(false);
 
         // Show busy status and cancel button
         showStatusMessage("⟳ " + operationName + " in progress...", Color.BLUE);
@@ -653,6 +663,12 @@ public class ActionsTab {
      * Get user's choice for tab handling when adding to existing retrieved objects
      */
     private String getUserTabChoice() {
+        // If user prefers to always create new tabs, bypass dialog
+        if (alwaysCreateNewTabCheckbox.isSelected()) {
+            objectByNameResults = new ObjectByNameResult();
+            return generateRetrievedObjectsResultId();
+        }
+
         // Check if there are existing retrieved objects tabs
         String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
         
@@ -683,6 +699,12 @@ public class ActionsTab {
      * Get user's choice for tab handling when performing bulk retrieval
      */
     private String getUserTabChoiceForBulkRetrieval(String objectType, int objectCount) {
+        // If user prefers to always create new tabs, bypass dialog
+        if (alwaysCreateNewTabCheckbox.isSelected()) {
+            objectByNameResults = new ObjectByNameResult();
+            return generateRetrievedObjectsResultId();
+        }
+
         // Check if there are existing retrieved objects tabs (use counter instead of current data)
         boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
 
@@ -2088,6 +2110,7 @@ public class ActionsTab {
         threadCountSpinner.setEnabled(hasRequests);
         usePresetWordlistCheckbox.setEnabled(hasRequests);
         selectWordlistBtn.setEnabled(hasRequests && !usePresetWordlistCheckbox.isSelected());
+        alwaysCreateNewTabCheckbox.setEnabled(hasRequests);
 
         // Discovery result selector depends on having discovery results
         discoveryResultSelector.setEnabled(hasRequests && hasDiscoveryResults);
