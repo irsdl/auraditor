@@ -246,6 +246,8 @@ public class ActionsTab {
     private final JButton selectWordlistBtn;
     private final JCheckBox usePresetWordlistCheckbox;
     private final JCheckBox alwaysCreateNewTabCheckbox;
+    private final JButton getRecordByIdBtn;
+    private final JTextField recordIdField;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
     private final JPanel statusPanel;
@@ -263,6 +265,7 @@ public class ActionsTab {
     private int objByNameResultCounter = 0;
     private int objsByWordlistResultCounter = 0;
     private int retrievedObjectsResultCounter = 0;
+    private int retrievedRecordsResultCounter = 0;
     private final List<String> availableDiscoveryResults = new ArrayList<>();
     
     // Progress tracking fields for bulk retrieval
@@ -308,6 +311,8 @@ public class ActionsTab {
         this.selectWordlistBtn = new JButton("Choose File...");
         this.usePresetWordlistCheckbox = new JCheckBox("Use built-in wordlist", true);
         this.alwaysCreateNewTabCheckbox = new JCheckBox("Always create new tab", false);
+        this.getRecordByIdBtn = new JButton("Get Record by ID");
+        this.recordIdField = new JTextField(15);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
         
@@ -422,7 +427,24 @@ public class ActionsTab {
         
         gbc.gridy++;
         actionsPanel.add(wordlistOptionsPanel, gbc);
-        
+
+        // Get Record by ID section
+        gbc.gridx = 0; gbc.gridy++; gbc.gridwidth = 2;
+        JLabel recordLabel = new JLabel("Get Record by ID");
+        recordLabel.setFont(recordLabel.getFont().deriveFont(Font.BOLD, 14f));
+        actionsPanel.add(recordLabel, gbc);
+
+        gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
+        getRecordByIdBtn.setText("Get Record by ID");
+        getRecordByIdBtn.setToolTipText("Get a specific record by its ID (sends 1 request)");
+        getRecordByIdBtn.setEnabled(false); // Initially disabled until text is entered
+        actionsPanel.add(getRecordByIdBtn, gbc);
+
+        gbc.gridx = 1;
+        recordIdField.setPreferredSize(new Dimension(200, 25));
+        recordIdField.setToolTipText("Enter the record ID to retrieve");
+        actionsPanel.add(recordIdField, gbc);
+
         // Thread count configuration
         gbc.gridy++; gbc.gridwidth = 2; gbc.weighty = 0.0;
         JPanel threadPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
@@ -541,10 +563,12 @@ public class ActionsTab {
         findAllObjectsBtn.setEnabled(false);
         findObjectByNameBtn.setEnabled(false);
         findDefaultObjectsPresetBtn.setEnabled(false);
+        getRecordByIdBtn.setEnabled(false);
 
         // Disable all input controls
         requestSelector.setEnabled(false);
         objectNameField.setEnabled(false);
+        recordIdField.setEnabled(false);
         threadCountSpinner.setEnabled(false);
         discoveryResultSelector.setEnabled(false);
         usePresetWordlistCheckbox.setEnabled(false);
@@ -641,6 +665,14 @@ public class ActionsTab {
     private String generateObjByNameResultId(int requestId) {
         objByNameResultCounter++;
         return "ObjByName-Request" + requestId + "-" + objByNameResultCounter;
+    }
+
+    /**
+     * Generate result ID for retrieved records operations
+     */
+    private String generateRetrievedRecordsResultId() {
+        retrievedRecordsResultCounter++;
+        return "Retrieved Records " + retrievedRecordsResultCounter;
     }
     
     /**
@@ -768,7 +800,71 @@ public class ActionsTab {
             }
         }
     }
-    
+
+    /**
+     * Get user's choice for tab handling when retrieving records
+     */
+    private String getUserTabChoiceForRecordRetrieval(String recordId) {
+        // If user prefers to always create new tabs, bypass dialog
+        if (alwaysCreateNewTabCheckbox.isSelected()) {
+            return generateRetrievedRecordsResultId();
+        }
+
+        // Check if there are existing retrieved records tabs
+        boolean hasExistingTabs = retrievedRecordsResultCounter > 0;
+
+        // Always show dialog asking user preference
+        String lastTabId = "Retrieved Records " + retrievedRecordsResultCounter;
+        Object[] options;
+        String message;
+
+        if (hasExistingTabs) {
+            options = new Object[]{
+                "Append to current tab (" + lastTabId + ")",
+                "Create new tab",
+                "Cancel"
+            };
+            message = "You are about to retrieve record: " + recordId + "\n" +
+                     "You already have retrieved records. How would you like to proceed?";
+        } else {
+            options = new Object[]{
+                "Create new tab",
+                "Cancel"
+            };
+            message = "You are about to retrieve record: " + recordId + "\n" +
+                     "How would you like to proceed?";
+        }
+
+        int choice = JOptionPane.showOptionDialog(
+            mainPanel,
+            message,
+            "Record Retrieval - Tab Selection",
+            JOptionPane.YES_NO_CANCEL_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0]
+        );
+
+        if (hasExistingTabs) {
+            switch (choice) {
+                case 0: // Append to existing tab
+                    return lastTabId;
+                case 1: // Create new tab
+                    return generateRetrievedRecordsResultId();
+                default: // Cancel or close
+                    return null;
+            }
+        } else {
+            switch (choice) {
+                case 0: // Create new tab (only option)
+                    return generateRetrievedRecordsResultId();
+                default: // Cancel or close
+                    return null;
+            }
+        }
+    }
+
     /**
      * Add a discovery result to the available results list
      */
@@ -1337,6 +1433,81 @@ public class ActionsTab {
     }
 
     /**
+     * Perform record retrieval by modifying the request with getRecord action
+     */
+    private void performRecordRetrieval(BaseRequest baseRequest, String resultId, String recordId) {
+        api.logging().logToOutput("Starting record retrieval for ID: " + recordId);
+
+        try {
+            // Escape the record ID for JSON
+            String escapedRecordId = recordId.replace("\\", "\\\\").replace("\"", "\\\"");
+
+            // Create the record retrieval payload with the specified format
+            String recordPayload = String.format(
+                "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"serviceComponent://ui.force.components.controllers.detail.DetailController/ACTION$getRecord\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{\"recordId\":\"%s\",\"record\":null,\"inContextOfComponent\":\"\",\"mode\":\"VIEW\",\"layoutType\":\"FULL\",\"defaultFieldValues\":null,\"navigationLocation\":\"LIST_VIEW_ROW\"}}]}",
+                escapedRecordId
+            );
+
+            // Create a modified request with the record retrieval payload in the message parameter
+            HttpRequest originalRequest = baseRequest.getRequestResponse().request();
+            HttpRequest recordRequest = modifyMessageParameter(originalRequest, recordPayload);
+
+            // Send the request
+            api.logging().logToOutput("Sending record retrieval request to: " + originalRequest.url());
+            HttpRequestResponse response = api.http().sendRequest(recordRequest);
+
+            if (response.response() == null) {
+                throw new RuntimeException("No response received");
+            }
+
+            // Parse the response to extract record data
+            String responseBody = response.response().bodyToString();
+            api.logging().logToOutput("Record retrieval response received, parsing data...");
+
+            // Create the result content for the tab
+            String resultContent = formatRecordRetrievalResult(recordId, responseBody);
+
+            // Create the result tab
+            SwingUtilities.invokeLater(() -> {
+                resultTabCallback.createResultTab(resultId, resultContent);
+                clearBusyState();
+                showStatusMessage("✓ Record retrieved successfully: " + recordId, Color.GREEN);
+            });
+
+        } catch (Exception e) {
+            api.logging().logToError("Record retrieval failed: " + e.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showErrorMessage("Record retrieval failed: " + e.getMessage());
+            });
+            throw e;
+        }
+    }
+
+    /**
+     * Format the record retrieval result for display
+     */
+    private String formatRecordRetrievalResult(String recordId, String responseBody) {
+        StringBuilder result = new StringBuilder();
+        result.append("Record ID: ").append(recordId).append("\n");
+        result.append("Retrieved at: ").append(java.time.LocalDateTime.now().toString()).append("\n");
+        result.append("==========================================\n\n");
+
+        try {
+            // Parse JSON response for better formatting
+            ObjectMapper mapper = new ObjectMapper();
+            Object jsonObject = mapper.readValue(responseBody, Object.class);
+            String prettyJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonObject);
+            result.append("Response Data:\n").append(prettyJson);
+        } catch (Exception e) {
+            // If JSON parsing fails, just show raw response
+            result.append("Raw Response:\n").append(responseBody);
+        }
+
+        return result.toString();
+    }
+
+    /**
      * Modify the message parameter in the request while preserving other parameters
      */
     private HttpRequest modifyMessageParameter(HttpRequest originalRequest, String messageValue) {
@@ -1807,7 +1978,30 @@ public class ActionsTab {
         findAllObjectsBtn.addActionListener(e -> executeAction("FindAllObjects"));
         findObjectByNameBtn.addActionListener(e -> executeAction("FindObjectByName"));
         findDefaultObjectsPresetBtn.addActionListener(e -> executeAction("FindDefaultObjectsPreset"));
-        
+        getRecordByIdBtn.addActionListener(e -> executeAction("GetRecordById"));
+
+        // Record ID field handler - enable/disable button based on text content
+        recordIdField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                updateRecordButtonState();
+            }
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                updateRecordButtonState();
+            }
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                updateRecordButtonState();
+            }
+
+            private void updateRecordButtonState() {
+                boolean hasText = !recordIdField.getText().trim().isEmpty();
+                boolean hasRequests = hasRequests();
+                getRecordByIdBtn.setEnabled(hasText && hasRequests && !isProcessing);
+            }
+        });
+
         // Cancel button handler
         cancelBtn.addActionListener(e -> {
             api.logging().logToOutput("Operation cancelled by user - stopping all requests");
@@ -2062,6 +2256,37 @@ public class ActionsTab {
                 });
                 currentOperationThread.start();
                 break;
+            case "GetRecordById":
+                String recordId = recordIdField.getText().trim();
+                if (recordId.isEmpty()) {
+                    showErrorMessage("Please enter a record ID.");
+                    return;
+                }
+
+                // Ask user about tab choice before starting record retrieval
+                String recordResultId = getUserTabChoiceForRecordRetrieval(recordId);
+                if (recordResultId == null) {
+                    return; // User cancelled
+                }
+
+                setBusyState(getRecordByIdBtn, "Getting Record");
+
+                api.logging().logToOutput("Retrieving record with ID: " + recordId);
+
+                // Perform record retrieval in background thread
+                currentOperationThread = new Thread(() -> {
+                    try {
+                        performRecordRetrieval(selectedRequest, recordResultId, recordId);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during record retrieval: " + e.getMessage());
+                            api.logging().logToError("Record retrieval failed: " + e.getMessage());
+                        });
+                    }
+                });
+                currentOperationThread.start();
+                break;
         }
     }
     
@@ -2103,9 +2328,13 @@ public class ActionsTab {
         
         // Wordlist button only depends on having requests
         findDefaultObjectsPresetBtn.setEnabled(hasRequests);
-        
+
+        // Get Record by ID depends on both having requests and non-empty record ID
+        updateRecordByIdButtonState();
+
         // Other UI elements
         objectNameField.setEnabled(hasRequests);
+        recordIdField.setEnabled(hasRequests);
         requestSelector.setEnabled(hasRequests);
         threadCountSpinner.setEnabled(hasRequests);
         usePresetWordlistCheckbox.setEnabled(hasRequests);
@@ -2129,7 +2358,13 @@ public class ActionsTab {
         boolean hasText = !objectNameField.getText().trim().isEmpty();
         findObjectByNameBtn.setEnabled(hasRequests && hasText);
     }
-    
+
+    private void updateRecordByIdButtonState() {
+        boolean hasRequests = !baseRequests.isEmpty();
+        boolean hasText = !recordIdField.getText().trim().isEmpty();
+        getRecordByIdBtn.setEnabled(hasRequests && hasText && !isProcessing);
+    }
+
     public boolean hasRequests() {
         return !baseRequests.isEmpty();
     }
@@ -2161,6 +2396,7 @@ public class ActionsTab {
         private JButton searchNextBtn;
         private JButton searchPrevBtn;
         private JButton resetBtn;
+        private JButton exportBtn;
         private JLabel searchStatusLabel;
         
         // Search state
@@ -2266,8 +2502,12 @@ public class ActionsTab {
             this.hideEmptyCheckBox = new JCheckBox("Hide Empty");
             filterPanel.add(hideEmptyCheckBox);
             
-            // Right panel: Reset button
+            // Right panel: Export and Reset buttons
             JPanel resetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+            this.exportBtn = new JButton("Export");
+            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
+            resetPanel.add(exportBtn);
+
             this.resetBtn = new JButton("Reset/Show All");
             resetPanel.add(resetBtn);
             
@@ -2283,6 +2523,9 @@ public class ActionsTab {
         }
         
         private void setupToolbarEventHandlers() {
+            // Export button - export filtered results to files
+            exportBtn.addActionListener(e -> performExport());
+
             // Search field - trigger search on Enter or text change with delay
             searchField.addActionListener(e -> performSearch());
             
@@ -2616,6 +2859,103 @@ public class ActionsTab {
             // Clear search when content changes
             clearSearch();
         }
+
+        /**
+         * Export filtered results to text files in a selected folder
+         */
+        private void performExport() {
+            // Use filtered model to get currently visible categories
+            DefaultListModel<String> modelToExport = filteredCategoryModel;
+
+            if (modelToExport.isEmpty()) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "No categories to export. Please ensure there are items in the list.",
+                        "Nothing to Export",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
+                return;
+            }
+
+            // Show folder selection dialog
+            javax.swing.JFileChooser folderChooser = new javax.swing.JFileChooser();
+            folderChooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+            folderChooser.setDialogTitle("Select Export Folder");
+
+            int result = folderChooser.showSaveDialog(this);
+            if (result != javax.swing.JFileChooser.APPROVE_OPTION) {
+                return; // User cancelled
+            }
+
+            java.io.File exportFolder = folderChooser.getSelectedFile();
+            if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Invalid folder selected for export.",
+                        "Export Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
+                return;
+            }
+
+            // Perform export in background thread
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    for (int i = 0; i < modelToExport.getSize(); i++) {
+                        String categoryName = modelToExport.getElementAt(i);
+
+                        // Get the objects for this category
+                        java.util.Set<String> categoryObjects = new java.util.HashSet<>();
+                        if (categoryName.contains("Default")) {
+                            categoryObjects.addAll(discoveryResult.getDefaultObjects());
+                        } else if (categoryName.contains("Custom")) {
+                            categoryObjects.addAll(discoveryResult.getCustomObjects());
+                        } else if (categoryName.contains("All")) {
+                            categoryObjects.addAll(discoveryResult.getAllObjects());
+                        }
+
+                        if (!categoryObjects.isEmpty()) {
+                            String safeFileName = sanitizeFilename(categoryName) + ".txt";
+                            java.io.File outputFile = new java.io.File(exportFolder, safeFileName);
+
+                            try (java.io.FileWriter writer = new java.io.FileWriter(outputFile)) {
+                                writer.write("Category: " + categoryName + "\n");
+                                writer.write("Exported at: " + java.time.LocalDateTime.now().toString() + "\n");
+                                writer.write("Total objects: " + categoryObjects.size() + "\n");
+                                writer.write("==========================================\n\n");
+
+                                for (String objectName : categoryObjects) {
+                                    writer.write(objectName + "\n");
+                                }
+                            }
+                        }
+                    }
+
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Export completed successfully!\nFiles saved to: " + exportFolder.getAbsolutePath(),
+                            "Export Successful",
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    });
+
+                } catch (Exception e) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Error during export: " + e.getMessage(),
+                            "Export Error",
+                            javax.swing.JOptionPane.ERROR_MESSAGE);
+                    });
+                }
+            });
+        }
+
+        /**
+         * Sanitize filename for cross-platform compatibility
+         */
+        private String sanitizeFilename(String filename) {
+            if (filename == null) return "unknown";
+            return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
+        }
     }
     
     /**
@@ -2665,13 +3005,14 @@ public class ActionsTab {
         private JButton searchNextBtn;
         private JButton searchPrevBtn;
         private JButton resetBtn;
+        private JButton exportBtn;
         private JLabel searchStatusLabel;
-        
+
         // Search state
         private int currentSearchIndex = -1;
         private List<Integer> searchMatches = new ArrayList<>();
         private String lastSearchText = "";
-        
+
         // Filter state
         private DefaultListModel<String> originalObjectModel;
         private DefaultListModel<String> filteredObjectModel;
@@ -2838,15 +3179,24 @@ public class ActionsTab {
 
             objectList.addMouseListener(mouseAdapter);
         }
-        
+
         private JPanel createToolbar() {
             JPanel toolbar = new JPanel(new BorderLayout());
             toolbar.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
-            
-            // Left panel: Search controls
+
+            // Left panel: Export and Search controls
             JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+
+            // Export button first
+            this.exportBtn = new JButton("Export");
+            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
+            searchPanel.add(exportBtn);
+
+            // Add separator
+            searchPanel.add(new javax.swing.JSeparator(javax.swing.SwingConstants.VERTICAL));
+
             searchPanel.add(new JLabel("Search:"));
-            
+
             this.searchField = new JTextField(15);
             searchPanel.add(searchField);
             
@@ -2874,8 +3224,12 @@ public class ActionsTab {
             this.hideEmptyCheckBox = new JCheckBox("Hide Empty");
             filterPanel.add(hideEmptyCheckBox);
             
-            // Right panel: Reset button
+            // Right panel: Export and Reset buttons
             JPanel resetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+            this.exportBtn = new JButton("Export");
+            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
+            resetPanel.add(exportBtn);
+
             this.resetBtn = new JButton("Reset/Show All");
             resetPanel.add(resetBtn);
             
@@ -2891,6 +3245,9 @@ public class ActionsTab {
         }
         
         private void setupToolbarEventHandlers() {
+            // Export button - export filtered results to files
+            exportBtn.addActionListener(e -> performExport());
+
             // Search field - trigger search on Enter or text change with delay
             searchField.addActionListener(e -> performSearch());
             
@@ -3515,6 +3872,123 @@ public class ActionsTab {
                         javax.swing.JOptionPane.ERROR_MESSAGE);
                 });
             }
+        }
+
+        /**
+         * Export filtered results to text files in a selected folder
+         */
+        private void performExport() {
+            // Use filtered model to get currently visible items
+            DefaultListModel<String> modelToExport = filteredObjectModel;
+
+            if (modelToExport.isEmpty()) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "No objects to export. Please ensure there are items in the list.",
+                        "Nothing to Export",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
+                return;
+            }
+
+            // Show folder selection dialog
+            javax.swing.JFileChooser folderChooser = new javax.swing.JFileChooser();
+            folderChooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+            folderChooser.setDialogTitle("Select Export Folder");
+
+            int result = folderChooser.showSaveDialog(this);
+            if (result != javax.swing.JFileChooser.APPROVE_OPTION) {
+                return; // User cancelled
+            }
+
+            java.io.File exportFolder = folderChooser.getSelectedFile();
+            if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Invalid folder selected for export.",
+                        "Export Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
+                return;
+            }
+
+            // Perform export in background thread
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    int exportedCount = 0;
+                    String timestamp = java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+                    for (int i = 0; i < modelToExport.getSize(); i++) {
+                        String objectName = modelToExport.getElementAt(i);
+                        String jsonData = currentObjectData.get(objectName);
+
+                        if (jsonData != null && !jsonData.trim().isEmpty()) {
+                            // Create safe filename
+                            String safeFilename = sanitizeFilename(objectName) + "_" + timestamp + ".txt";
+                            java.io.File outputFile = new java.io.File(exportFolder, safeFilename);
+
+                            // Write content to file
+                            try (java.io.FileWriter writer = new java.io.FileWriter(outputFile, java.nio.charset.StandardCharsets.UTF_8)) {
+                                writer.write("Object Name: " + objectName + "\n");
+                                writer.write("Export Time: " + java.time.LocalDateTime.now().toString() + "\n");
+                                writer.write("=" + "=".repeat(60) + "\n\n");
+                                writer.write(jsonData);
+                                exportedCount++;
+                            }
+                        }
+                    }
+
+                    final int finalExportedCount = exportedCount;
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Successfully exported " + finalExportedCount + " objects to:\n" + exportFolder.getAbsolutePath(),
+                            "Export Complete",
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    });
+
+                    api.logging().logToOutput("Exported " + finalExportedCount + " objects to: " + exportFolder.getAbsolutePath());
+
+                } catch (Exception e) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Failed to export objects: " + e.getMessage(),
+                            "Export Error",
+                            javax.swing.JOptionPane.ERROR_MESSAGE);
+                    });
+                    api.logging().logToError("Export failed: " + e.getMessage());
+                }
+            });
+        }
+
+        /**
+         * Sanitize filename for cross-platform compatibility
+         */
+        private String sanitizeFilename(String filename) {
+            if (filename == null || filename.trim().isEmpty()) {
+                return "unnamed_object";
+            }
+
+            // Remove/replace problematic characters
+            String sanitized = filename
+                .replaceAll("[<>:\"/\\\\|?*]", "_")  // Replace invalid characters
+                .replaceAll("\\s+", "_")              // Replace whitespace with underscore
+                .replaceAll("_{2,}", "_");            // Replace multiple underscores with single
+
+            // Limit length (Windows has 255 char limit, but we'll be conservative)
+            if (sanitized.length() > 100) {
+                sanitized = sanitized.substring(0, 100);
+            }
+
+            // Ensure it doesn't start/end with dots or spaces
+            sanitized = sanitized.replaceAll("^[.\\s]+|[.\\s]+$", "");
+
+            // If empty after sanitization, provide default
+            if (sanitized.isEmpty()) {
+                sanitized = "unnamed_object";
+            }
+
+            return sanitized;
         }
 
     }
