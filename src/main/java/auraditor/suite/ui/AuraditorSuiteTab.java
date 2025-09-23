@@ -7,6 +7,7 @@
 package auraditor.suite.ui;
 
 import auraditor.suite.BaseRequest;
+import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 
@@ -43,6 +44,9 @@ public class AuraditorSuiteTab {
         // Create results tabbed pane for dynamic result tabs
         this.resultsTabbedPane = new JTabbedPane();
         this.resultsTabbedPane.addTab("No Results", new JLabel("No results yet", SwingConstants.CENTER));
+
+        // Add right-click context menu for tab deletion
+        setupResultsTabContextMenu();
         
         // Create and add Base Requests tab
         this.baseRequestsTab = new BaseRequestsTab(api, baseRequests);
@@ -68,6 +72,10 @@ public class AuraditorSuiteTab {
             @Override
             public void updateObjectByNameTab(String resultId, ActionsTab.ObjectByNameResult objectByNameResult) {
                 AuraditorSuiteTab.this.updateObjectByNameTabWithoutSwitching(resultId, objectByNameResult);
+            }
+
+            public void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
+                AuraditorSuiteTab.this.createRetrievedRecordsTab(resultId, recordId, recordData);
             }
         });
         this.tabbedPane.addTab("Actions", actionsTab.getComponent());
@@ -250,7 +258,56 @@ public class AuraditorSuiteTab {
             // tabbedPane.setSelectedIndex(2); // This line is intentionally omitted
         });
     }
-    
+
+    /**
+     * Create a new retrieved records result tab with raw data or add to existing tab
+     */
+    private void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
+        SwingUtilities.invokeLater(() -> {
+            // Remove "No Results" tab if it exists
+            if (resultsTabbedPane.getTabCount() == 1 &&
+                "No Results".equals(resultsTabbedPane.getTitleAt(0))) {
+                resultsTabbedPane.removeTabAt(0);
+            }
+
+            // Check if "Retrieved Records" tab already exists
+            ActionsTab.RetrievedRecordsResultPanel existingPanel = null;
+            int existingTabIndex = -1;
+
+            for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
+                String tabTitle = resultsTabbedPane.getTitleAt(i);
+                if ("Retrieved Records".equals(tabTitle)) {
+                    Component component = resultsTabbedPane.getComponentAt(i);
+                    if (component instanceof ActionsTab.RetrievedRecordsResultPanel) {
+                        existingPanel = (ActionsTab.RetrievedRecordsResultPanel) component;
+                        existingTabIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (existingPanel != null) {
+                // Add to existing tab
+                existingPanel.addRecord(recordId, recordData);
+
+                // Switch to the existing tab
+                resultsTabbedPane.setSelectedIndex(existingTabIndex);
+            } else {
+                // Create new tab
+                ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel = new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData);
+
+                // Add the new result tab with a fixed name for accumulation
+                resultsTabbedPane.addTab("Retrieved Records", retrievedRecordsPanel);
+
+                // Switch to the new tab
+                resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
+            }
+
+            // Switch to Results tab in main tabbed pane
+            tabbedPane.setSelectedIndex(2); // Results tab index
+        });
+    }
+
     /**
      * Get the main UI component for this tab
      * 
@@ -327,20 +384,156 @@ public class AuraditorSuiteTab {
             tabbedPane.setForegroundAt(baseRequestsTabIndex, Color.ORANGE);
             
             // Create timer to revert back to normal after 1 second
-            Timer timer = new Timer(1000, e -> {
+            Timer timer = ThreadManager.createManagedTimer(1000, e -> {
                 tabbedPane.setForegroundAt(baseRequestsTabIndex, null); // Revert to default color
             });
             timer.setRepeats(false);
             timer.start();
         });
     }
-    
+
+    /**
+     * Setup right-click context menu for results tabs
+     */
+    private void setupResultsTabContextMenu() {
+        resultsTabbedPane.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    showResultsTabContextMenu(e);
+                }
+            }
+
+            @Override
+            public void mouseReleased(java.awt.event.MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    showResultsTabContextMenu(e);
+                }
+            }
+        });
+    }
+
+    /**
+     * Show context menu for results tab
+     */
+    private void showResultsTabContextMenu(java.awt.event.MouseEvent e) {
+        // Find which tab was right-clicked
+        int clickedTab = -1;
+        for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
+            java.awt.Rectangle tabBounds = resultsTabbedPane.getBoundsAt(i);
+            if (tabBounds != null && tabBounds.contains(e.getPoint())) {
+                clickedTab = i;
+                break;
+            }
+        }
+
+        if (clickedTab >= 0) {
+            String tabTitle = resultsTabbedPane.getTitleAt(clickedTab);
+
+            // Don't show context menu for "No Results" tab
+            if ("No Results".equals(tabTitle)) {
+                return;
+            }
+
+            // Check if scan is in progress
+            boolean scanInProgress = actionsTab.isProcessing();
+
+            javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+            javax.swing.JMenuItem deleteItem = new javax.swing.JMenuItem("Delete Tab");
+
+            if (scanInProgress) {
+                deleteItem.setEnabled(false);
+                deleteItem.setToolTipText("Cannot delete tab while scan is in progress. Cancel the scan first.");
+            } else {
+                deleteItem.setToolTipText("Delete this results tab");
+                final int tabIndex = clickedTab;
+                deleteItem.addActionListener(actionEvent -> deleteResultsTab(tabIndex, tabTitle));
+            }
+
+            popup.add(deleteItem);
+            popup.show(e.getComponent(), e.getX(), e.getY());
+        }
+    }
+
+    /**
+     * Delete a results tab and handle dependencies
+     */
+    private void deleteResultsTab(int tabIndex, String tabTitle) {
+        SwingUtilities.invokeLater(() -> {
+            // Show confirmation dialog
+            int confirm = javax.swing.JOptionPane.showConfirmDialog(
+                mainPanel,
+                "Are you sure you want to delete the tab '" + tabTitle + "'?\nThis action cannot be undone.",
+                "Confirm Tab Deletion",
+                javax.swing.JOptionPane.YES_NO_OPTION,
+                javax.swing.JOptionPane.WARNING_MESSAGE
+            );
+
+            if (confirm != javax.swing.JOptionPane.YES_OPTION) {
+                return; // User cancelled
+            }
+
+            // Remove the tab
+            resultsTabbedPane.removeTabAt(tabIndex);
+
+            // Handle special cases based on tab title
+            if (tabTitle.startsWith("Discovered Objects")) {
+                // Reset discovery state in ActionsTab
+                actionsTab.resetDiscoveryState();
+                api.logging().logToOutput("Deleted discovery results tab: " + tabTitle);
+            } else if (tabTitle.startsWith("Objects") || tabTitle.startsWith("Retrieved Objects")) {
+                // Clean up object results tracking
+                existingObjectPanels.remove(tabTitle);
+                api.logging().logToOutput("Deleted object results tab: " + tabTitle);
+            } else if (tabTitle.startsWith("Retrieved Records")) {
+                // Clean up record results tracking
+                api.logging().logToOutput("Deleted record results tab: " + tabTitle);
+            } else {
+                api.logging().logToOutput("Deleted results tab: " + tabTitle);
+            }
+
+            // If no more tabs, add "No Results" tab back
+            if (resultsTabbedPane.getTabCount() == 0) {
+                resultsTabbedPane.addTab("No Results", new JLabel("No results yet", SwingConstants.CENTER));
+            }
+        });
+    }
+
     /**
      * Get the number of base requests currently stored
-     * 
+     *
      * @return the count of base requests
      */
     public int getBaseRequestCount() {
         return baseRequests.size();
+    }
+
+    /**
+     * Cleanup method to properly dispose of resources when extension is unloaded
+     */
+    public void cleanup() {
+        try {
+            // Cleanup the actions tab which contains most threads
+            if (actionsTab != null) {
+                actionsTab.cleanup();
+            }
+
+            // Cleanup the base requests tab
+            if (baseRequestsTab != null) {
+                baseRequestsTab.cleanup();
+            }
+
+            // Clear any remaining UI components
+            if (tabbedPane != null) {
+                tabbedPane.removeAll();
+            }
+            if (resultsTabbedPane != null) {
+                resultsTabbedPane.removeAll();
+            }
+
+            api.logging().logToOutput("AuraditorSuiteTab cleanup completed");
+        } catch (Exception e) {
+            api.logging().logToError("Error during AuraditorSuiteTab cleanup: " + e.getMessage());
+        }
     }
 }

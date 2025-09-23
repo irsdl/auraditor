@@ -10,13 +10,18 @@ import auraditor.requesteditor.ui.AuraActionsTabFactory;
 import auraditor.requesteditor.ui.AuraContextTabFactory;
 import auraditor.suite.ui.AuraditorContextMenuProvider;
 import auraditor.suite.ui.AuraditorSuiteTab;
+import auraditor.core.ThreadManager;
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
 
 public class BurpExtender implements BurpExtension {
 
+	private AuraditorSuiteTab auraditorSuiteTab;
+	private MontoyaApi api;
+
 	@Override
 	public void initialize(MontoyaApi api) {
+		this.api = api;
 		api.extension().setName("Auraditor");
 
 		// Log version and build information
@@ -38,7 +43,7 @@ public class BurpExtender implements BurpExtension {
 
 		// Create and register the main Auraditor suite tab
 		api.logging().logToOutput("Creating Auraditor Suite Tab...");
-		AuraditorSuiteTab auraditorSuiteTab = new AuraditorSuiteTab(api);
+		auraditorSuiteTab = new AuraditorSuiteTab(api);
 		api.userInterface().registerSuiteTab("Auraditor", auraditorSuiteTab.getComponent());
 		api.logging().logToOutput("Auraditor Suite Tab registered successfully");
 
@@ -51,5 +56,29 @@ public class BurpExtender implements BurpExtension {
 		api.logging().logToOutput("- Main Auraditor tab available in suite (with 'Add Latest Compatible Request' button)");
 		api.logging().logToOutput("- Right-click 'Send to Auraditor' available for Aura requests");
 		api.logging().logToOutput("=====================================");
+
+		// Register shutdown hook to ensure proper cleanup
+		api.extension().registerUnloadingHandler(this::cleanup);
+	}
+
+	/**
+	 * Cleanup method called when the extension is unloaded
+	 */
+	private void cleanup() {
+		api.logging().logToOutput("=== Auraditor Extension Cleanup Starting ===");
+
+		try {
+			// Stop all threads managed by ThreadManager
+			ThreadManager.shutdown();
+
+			// Cleanup the main suite tab
+			if (auraditorSuiteTab != null) {
+				auraditorSuiteTab.cleanup();
+			}
+
+			api.logging().logToOutput("=== Auraditor Extension Cleanup Completed ===");
+		} catch (Exception e) {
+			api.logging().logToError("Error during cleanup: " + e.getMessage());
+		}
 	}
 }

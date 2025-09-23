@@ -1,15 +1,13 @@
 /*
  * Copyright (c) 2020, salesforce.com, inc.
- * All righ        this.findDefaultObjectsPresetBtn = new JButton("Get Objects with Wordlist");
-        this.selectWordlistBtn = new JButton("Choose File...");
-        this.usePresetWordlistCheckbox = new JCheckBox("Use built-in wordlist", true);
-        this.cancelBtn = new JButton("Cancel");reserved.
+ * All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause
- * For full license text, see the LICENSE file in the repo root     private void setupEventHandlers() {/opensource.org/licenses/BSD-3-Clause
+ * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 package auraditor.suite.ui;
 
 import auraditor.suite.BaseRequest;
+import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
 import burp.api.montoya.http.message.requests.HttpRequest;
@@ -72,8 +70,8 @@ public class ActionsTab {
             }
             
             // Use CompletableFuture with timeout for safe execution
-            java.util.concurrent.CompletableFuture<java.util.List<Integer>> future = 
-                java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            java.util.concurrent.CompletableFuture<java.util.List<Integer>> future =
+                ThreadManager.createManagedFuture(() -> {
                     java.util.List<Integer> results = new java.util.ArrayList<>();
                     java.util.regex.Matcher matcher = pattern.matcher(text);
                     int matchCount = 0;
@@ -110,8 +108,8 @@ public class ActionsTab {
                 return false;
             }
             
-            java.util.concurrent.CompletableFuture<Boolean> future = 
-                java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            java.util.concurrent.CompletableFuture<Boolean> future =
+                ThreadManager.createManagedFuture(() -> {
                     return pattern.matcher(text).find();
                 });
             
@@ -523,7 +521,7 @@ public class ActionsTab {
         
         // Auto-clear informational and success messages
         if (color.equals(Color.BLUE) || color.equals(Color.GREEN)) {
-            Timer timer = new Timer(5000, e -> clearStatusMessage());
+            Timer timer = ThreadManager.createManagedTimer(5000, e -> clearStatusMessage());
             timer.setRepeats(false);
             timer.start();
         }
@@ -2074,7 +2072,7 @@ public class ActionsTab {
                 String discoverResultId = generateDiscoverResultId(selectedRequest.getId());
                 
                 // Perform object discovery in background thread
-                new Thread(() -> {
+                ThreadManager.createManagedThread(() -> {
                     try {
                         performObjectDiscovery(selectedRequest, discoverResultId);
                     } catch (Exception e) {
@@ -2084,7 +2082,7 @@ public class ActionsTab {
                             api.logging().logToError("Object discovery failed: " + e.getMessage());
                         });
                     }
-                }).start();
+                }, "ObjectDiscovery-" + discoverResultId).start();
                 break;
             case "FindDefaultObjects":
                 String selectedDiscoveryResult = getSelectedDiscoveryResult();
@@ -2107,7 +2105,7 @@ public class ActionsTab {
                 api.logging().logToOutput("Retrieving " + discoveredDefaultObjects.size() + " default objects from discovery result: " + selectedDiscoveryResult);
                 
                 // Perform bulk object retrieval in background thread
-                currentOperationThread = new Thread(() -> {
+                currentOperationThread = ThreadManager.createManagedThread(() -> {
                     try {
                         performBulkObjectRetrieval(selectedRequest, tabId, discoveredDefaultObjects, "default objects");
                     } catch (Exception e) {
@@ -2117,7 +2115,7 @@ public class ActionsTab {
                             api.logging().logToError("Default objects retrieval failed: " + e.getMessage());
                         });
                     }
-                });
+                }, "BulkObjectRetrieval-Default-" + tabId);
                 currentOperationThread.start();
                 break;
             case "FindCustomObjects":
@@ -2141,7 +2139,7 @@ public class ActionsTab {
                 api.logging().logToOutput("Retrieving " + discoveredCustomObjects.size() + " custom objects from discovery result: " + selectedDiscoveryResult);
                 
                 // Perform bulk object retrieval in background thread
-                currentOperationThread = new Thread(() -> {
+                currentOperationThread = ThreadManager.createManagedThread(() -> {
                     try {
                         performBulkObjectRetrieval(selectedRequest, customTabId, discoveredCustomObjects, "custom objects");
                     } catch (Exception e) {
@@ -2151,7 +2149,7 @@ public class ActionsTab {
                             api.logging().logToError("Custom objects retrieval failed: " + e.getMessage());
                         });
                     }
-                });
+                }, "BulkObjectRetrieval-Custom-" + customTabId);
                 currentOperationThread.start();
                 break;
             case "FindAllObjects":
@@ -2182,7 +2180,7 @@ public class ActionsTab {
                     " custom) from discovery result: " + selectedDiscoveryResult);
                 
                 // Perform bulk object retrieval in background thread
-                currentOperationThread = new Thread(() -> {
+                currentOperationThread = ThreadManager.createManagedThread(() -> {
                     try {
                         performBulkObjectRetrieval(selectedRequest, allTabId, allDiscoveredObjects, "all objects");
                     } catch (Exception e) {
@@ -2192,7 +2190,7 @@ public class ActionsTab {
                             api.logging().logToError("All objects retrieval failed: " + e.getMessage());
                         });
                     }
-                });
+                }, "BulkObjectRetrieval-All-" + allTabId);
                 currentOperationThread.start();
                 break;
             case "FindObjectByName":
@@ -2210,7 +2208,7 @@ public class ActionsTab {
                 setBusyState(findObjectByNameBtn, "Getting Object by Name");
 
                 // Perform specific object search in background thread
-                new Thread(() -> {
+                ThreadManager.createManagedThread(() -> {
                     try {
                         performSpecificObjectSearch(selectedRequest, objByNameResultId, objectName);
                     } catch (Exception e) {
@@ -2220,7 +2218,7 @@ public class ActionsTab {
                             api.logging().logToError("Specific object search failed: " + e.getMessage());
                         });
                     }
-                }).start();
+                }, "SpecificObjectSearch-" + objectName).start();
                 break;
             case "FindDefaultObjectsPreset":
                 if (!usePresetWordlistCheckbox.isSelected() && selectedWordlistFile == null) {
@@ -2243,7 +2241,7 @@ public class ActionsTab {
                 api.logging().logToOutput("Starting wordlist scan using: " + wordlistSource);
 
                 // Perform wordlist scanning in background thread
-                currentOperationThread = new Thread(() -> {
+                currentOperationThread = ThreadManager.createManagedThread(() -> {
                     try {
                         performWordlistScan(selectedRequest, wordlistResultId, wordlistSource);
                     } catch (Exception e) {
@@ -2253,7 +2251,7 @@ public class ActionsTab {
                             api.logging().logToError("Wordlist scan failed: " + e.getMessage());
                         });
                     }
-                });
+                }, "WordlistScan-" + wordlistResultId);
                 currentOperationThread.start();
                 break;
             case "GetRecordById":
@@ -2274,7 +2272,7 @@ public class ActionsTab {
                 api.logging().logToOutput("Retrieving record with ID: " + recordId);
 
                 // Perform record retrieval in background thread
-                currentOperationThread = new Thread(() -> {
+                currentOperationThread = ThreadManager.createManagedThread(() -> {
                     try {
                         performRecordRetrieval(selectedRequest, recordResultId, recordId);
                     } catch (Exception e) {
@@ -2284,7 +2282,7 @@ public class ActionsTab {
                             api.logging().logToError("Record retrieval failed: " + e.getMessage());
                         });
                     }
-                });
+                }, "RecordRetrieval-" + recordId);
                 currentOperationThread.start();
                 break;
         }
@@ -2387,6 +2385,7 @@ public class ActionsTab {
         protected JCheckBox searchRegexCheckBox;
         protected JCheckBox filterRegexCheckBox;
         protected JCheckBox hideEmptyCheckBox;
+        protected JButton searchBtn;
         protected JButton searchNextBtn;
         protected JButton searchPrevBtn;
         protected JButton resetBtn;
@@ -2424,8 +2423,10 @@ public class ActionsTab {
             this.searchRegexCheckBox = new JCheckBox("Regex");
             searchPanel.add(searchRegexCheckBox);
 
+            this.searchBtn = new JButton("Search");
             this.searchNextBtn = new JButton("Next");
             this.searchPrevBtn = new JButton("Prev");
+            searchPanel.add(searchBtn);
             searchPanel.add(searchNextBtn);
             searchPanel.add(searchPrevBtn);
 
@@ -2468,30 +2469,18 @@ public class ActionsTab {
             // Export button
             exportBtn.addActionListener(e -> performExport());
 
-            // Search field - trigger search on Enter or text change with delay
-            searchField.addActionListener(e -> performSearch());
-
-            javax.swing.Timer searchTimer = new javax.swing.Timer(500, e -> {
-                if (!searchField.getText().equals(lastSearchText)) {
+            // Search button - trigger search when clicked
+            searchBtn.addActionListener(e -> {
+                if (!searchField.getText().trim().isEmpty()) {
                     performSearch();
+                } else {
+                    clearSearchHighlighting();
+                    updateSearchStatus("Enter search text");
                 }
             });
-            searchTimer.setRepeats(false);
 
-            searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-                @Override
-                public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-                @Override
-                public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-                @Override
-                public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                    searchTimer.restart();
-                }
-            });
+            // Allow Enter key in search field to trigger search
+            searchField.addActionListener(e -> searchBtn.doClick());
 
             // Search navigation buttons
             searchNextBtn.addActionListener(e -> navigateSearch(true));
@@ -2501,7 +2490,7 @@ public class ActionsTab {
             searchRegexCheckBox.addActionListener(e -> performSearch());
 
             // Filter field - trigger filter on text change with delay
-            javax.swing.Timer filterTimer = new javax.swing.Timer(300, e -> applyFilter());
+            javax.swing.Timer filterTimer = ThreadManager.createManagedTimer(300, e -> applyFilter());
             filterTimer.setRepeats(false);
 
             filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -2962,7 +2951,7 @@ public class ActionsTab {
             }
 
             // Perform export in background thread
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
+            ThreadManager.createManagedRunAsync(() -> {
                 try {
                     for (int i = 0; i < modelToExport.getSize(); i++) {
                         String categoryName = modelToExport.getElementAt(i);
@@ -3015,7 +3004,7 @@ public class ActionsTab {
         /**
          * Sanitize filename for cross-platform compatibility
          */
-        private String sanitizeFilename(String filename) {
+        protected String sanitizeFilename(String filename) {
             if (filename == null) return "unknown";
             return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
         }
@@ -3239,58 +3228,6 @@ public class ActionsTab {
 
             objectList.addMouseListener(mouseAdapter);
         }
-
-            // Add separator
-            searchPanel.add(new javax.swing.JSeparator(javax.swing.SwingConstants.VERTICAL));
-
-            searchPanel.add(new JLabel("Search:"));
-
-            this.searchField = new JTextField(15);
-            searchPanel.add(searchField);
-            
-            this.searchRegexCheckBox = new JCheckBox("Regex");
-            searchPanel.add(searchRegexCheckBox);
-            
-            this.searchNextBtn = new JButton("Next");
-            this.searchPrevBtn = new JButton("Prev");
-            searchPanel.add(searchNextBtn);
-            searchPanel.add(searchPrevBtn);
-            
-            this.searchStatusLabel = new JLabel(" ");
-            searchPanel.add(searchStatusLabel);
-            
-            // Center panel: Filter controls
-            JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
-            filterPanel.add(new JLabel("Filter:"));
-            
-            this.filterField = new JTextField(15);
-            filterPanel.add(filterField);
-            
-            this.filterRegexCheckBox = new JCheckBox("Regex");
-            filterPanel.add(filterRegexCheckBox);
-            
-            this.hideEmptyCheckBox = new JCheckBox("Hide Empty");
-            filterPanel.add(hideEmptyCheckBox);
-            
-            // Right panel: Export and Reset buttons
-            JPanel resetPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
-            this.exportBtn = new JButton("Export");
-            exportBtn.setToolTipText("Export filtered results to text files in a selected folder");
-            resetPanel.add(exportBtn);
-
-            this.resetBtn = new JButton("Reset/Show All");
-            resetPanel.add(resetBtn);
-            
-            // Add panels to toolbar
-            toolbar.add(searchPanel, BorderLayout.WEST);
-            toolbar.add(filterPanel, BorderLayout.CENTER);
-            toolbar.add(resetPanel, BorderLayout.EAST);
-            
-            // Add event listeners
-            setupToolbarEventHandlers();
-            
-            return toolbar;
-        }
         
         private void setupToolbarEventHandlers() {
             // Export button - export filtered results to files
@@ -3329,7 +3266,7 @@ public class ActionsTab {
             searchRegexCheckBox.addActionListener(e -> performSearch());
             
             // Filter field - trigger filter on text change with delay
-            javax.swing.Timer filterTimer = new javax.swing.Timer(300, e -> applyFilter());
+            javax.swing.Timer filterTimer = ThreadManager.createManagedTimer(300, e -> applyFilter());
             filterTimer.setRepeats(false);
             
             filterField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -3439,7 +3376,7 @@ public class ActionsTab {
             }
         }
         
-        private void navigateSearch(boolean forward) {
+        protected void navigateSearch(boolean forward) {
             if (searchMatches.isEmpty()) {
                 updateSearchStatus("No search results");
                 return;
@@ -3455,7 +3392,7 @@ public class ActionsTab {
             updateSearchStatus((currentSearchIndex + 1) + " of " + searchMatches.size());
         }
         
-        private void highlightCurrentMatch() {
+        protected void highlightCurrentMatch() {
             if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
                 int matchStart = searchMatches.get(currentSearchIndex);
                 int matchEnd = matchStart + searchField.getText().length();
@@ -3466,11 +3403,11 @@ public class ActionsTab {
             }
         }
         
-        private void updateSearchStatus(String message) {
+        protected void updateSearchStatus(String message) {
             searchStatusLabel.setText(message);
         }
         
-        private void applyFilter() {
+        protected void applyFilter() {
             String filterText = filterField.getText().trim();
             
             if (filterText.isEmpty() && !hideEmptyCheckBox.isSelected()) {
@@ -3559,7 +3496,7 @@ public class ActionsTab {
             }
         }
         
-        private void clearSearch() {
+        protected void clearSearch() {
             currentSearchIndex = -1;
             searchMatches.clear();
             lastSearchText = "";
@@ -3567,8 +3504,13 @@ public class ActionsTab {
             jsonDataArea.setSelectionStart(0);
             jsonDataArea.setSelectionEnd(0);
         }
+
+        protected void clearSearchHighlighting() {
+            jsonDataArea.setSelectionStart(0);
+            jsonDataArea.setSelectionEnd(0);
+        }
         
-        private void resetAllFilters() {
+        protected void resetAllFilters() {
             searchField.setText("");
             filterField.setText("");
             hideEmptyCheckBox.setSelected(false);
@@ -3926,7 +3868,7 @@ public class ActionsTab {
         /**
          * Export filtered results to text files in a selected folder
          */
-        private void performExport() {
+        protected void performExport() {
             // Use filtered model to get currently visible items
             DefaultListModel<String> modelToExport = filteredObjectModel;
 
@@ -3962,7 +3904,7 @@ public class ActionsTab {
             }
 
             // Perform export in background thread
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
+            ThreadManager.createManagedRunAsync(() -> {
                 try {
                     int exportedCount = 0;
                     String timestamp = java.time.LocalDateTime.now().format(
@@ -4013,7 +3955,7 @@ public class ActionsTab {
         /**
          * Sanitize filename for cross-platform compatibility
          */
-        private String sanitizeFilename(String filename) {
+        protected String sanitizeFilename(String filename) {
             if (filename == null || filename.trim().isEmpty()) {
                 return "unnamed_object";
             }
@@ -4040,5 +3982,222 @@ public class ActionsTab {
             return sanitized;
         }
 
+    }
+
+    /**
+     * Panel for displaying retrieved records results with two-pane layout
+     */
+    public static class RetrievedRecordsResultPanel extends BaseResultPanel {
+        private final String recordId;
+        private final String recordData;
+        private final JSplitPane splitPane;
+        private final JList<String> recordList;
+        private final JTextArea dataArea;
+
+        public RetrievedRecordsResultPanel(String recordId, String recordData) {
+            this.recordId = recordId;
+            this.recordData = recordData;
+            this.setLayout(new BorderLayout());
+
+            // Create shared toolbar
+            add(createSharedToolbar(), BorderLayout.NORTH);
+
+            // Create record list
+            DefaultListModel<String> listModel = new DefaultListModel<>();
+            listModel.addElement(recordId);
+            this.recordList = new JList<>(listModel);
+            recordList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            recordList.setSelectedIndex(0);
+
+            // Create data area
+            this.dataArea = new JTextArea(recordData);
+            dataArea.setEditable(false);
+            dataArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+
+            // Create split pane
+            JScrollPane recordScrollPane = new JScrollPane(recordList);
+            JScrollPane dataScrollPane = new JScrollPane(dataArea);
+            recordScrollPane.setPreferredSize(new Dimension(200, 400));
+            dataScrollPane.setPreferredSize(new Dimension(600, 400));
+
+            this.splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, recordScrollPane, dataScrollPane);
+            splitPane.setDividerLocation(200);
+            splitPane.setResizeWeight(0.25);
+
+            add(splitPane, BorderLayout.CENTER);
+
+            // Add selection listener
+            recordList.addListSelectionListener(e -> {
+                if (!e.getValueIsAdjusting()) {
+                    String selectedRecord = recordList.getSelectedValue();
+                    if (selectedRecord != null) {
+                        dataArea.setText(recordData);
+                    }
+                }
+            });
+        }
+
+        @Override
+        protected void performSearch() {
+            // Simple search implementation
+            String searchText = searchField.getText().trim();
+            if (searchText.isEmpty()) {
+                clearSearchHighlighting();
+                return;
+            }
+
+            String text = dataArea.getText();
+            searchMatches.clear();
+            currentSearchIndex = -1;
+            lastSearchText = searchText;
+
+            int index = text.indexOf(searchText);
+            while (index >= 0) {
+                searchMatches.add(index);
+                index = text.indexOf(searchText, index + 1);
+            }
+
+            if (!searchMatches.isEmpty()) {
+                currentSearchIndex = 0;
+                highlightCurrentMatch();
+                updateSearchStatus("1 of " + searchMatches.size());
+            } else {
+                updateSearchStatus("No matches found");
+            }
+        }
+
+        @Override
+        protected void applyFilter() {
+            // Simple filter implementation - no filtering for records panel
+        }
+
+        @Override
+        protected void performExport() {
+            // Export implementation
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fileChooser.setDialogTitle("Select folder to export record data");
+
+            if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                File selectedFolder = fileChooser.getSelectedFile();
+                String filename = sanitizeFilename(recordId) + ".txt";
+                File outputFile = new File(selectedFolder, filename);
+
+                try (java.io.FileWriter writer = new java.io.FileWriter(outputFile)) {
+                    writer.write("Record ID: " + recordId + "\n\n");
+                    writer.write(recordData);
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Record exported successfully to:\n" + outputFile.getAbsolutePath(),
+                            "Export Complete",
+                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                    });
+                } catch (Exception e) {
+                    javax.swing.SwingUtilities.invokeLater(() -> {
+                        javax.swing.JOptionPane.showMessageDialog(this,
+                            "Export failed: " + e.getMessage(),
+                            "Export Error",
+                            javax.swing.JOptionPane.ERROR_MESSAGE);
+                    });
+                }
+            }
+        }
+
+        @Override
+        protected void highlightCurrentMatch() {
+            if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
+                int matchStart = searchMatches.get(currentSearchIndex);
+                int matchEnd = matchStart + searchField.getText().length();
+                dataArea.setSelectionStart(matchStart);
+                dataArea.setSelectionEnd(matchEnd);
+                dataArea.requestFocus();
+            }
+        }
+
+        @Override
+        protected void clearSearchHighlighting() {
+            dataArea.setSelectionStart(0);
+            dataArea.setSelectionEnd(0);
+        }
+
+        /**
+         * Add a new record to the panel
+         */
+        public void addRecord(String recordId, String recordData) {
+            DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
+            model.addElement(recordId);
+            recordList.setSelectedIndex(model.getSize() - 1);
+            dataArea.setText(recordData);
+        }
+    }
+
+    /**
+     * Check if the tab is currently processing an operation
+     */
+    public boolean isProcessing() {
+        return currentOperationThread != null && currentOperationThread.isAlive();
+    }
+
+    /**
+     * Reset discovery state (used when deleting discovery tabs)
+     */
+    public void resetDiscoveryState() {
+        discoveredDefaultObjects.clear();
+        discoveredCustomObjects.clear();
+        availableDiscoveryResults.clear();
+        discoveryResultSelector.removeAllItems();
+        discoveryResultSelector.setEnabled(false);
+
+        // Reset UI states
+        findDefaultObjectsBtn.setEnabled(false);
+        findCustomObjectsBtn.setEnabled(false);
+        findAllObjectsBtn.setEnabled(false);
+
+        api.logging().logToOutput("Discovery state has been reset");
+    }
+
+    /**
+     * Cancel any running operation
+     */
+    public void cancelOperation() {
+        api.logging().logToOutput("Operation cancelled - stopping all requests");
+        operationCancelled = true; // Set cancellation flag immediately
+
+        // More aggressive thread stopping
+        if (currentOperationThread != null && currentOperationThread.isAlive()) {
+            api.logging().logToOutput("Interrupting operation thread: " + currentOperationThread.getName());
+            currentOperationThread.interrupt();
+
+            // Try to wait briefly for graceful shutdown
+            try {
+                currentOperationThread.join(100); // Wait max 100ms
+            } catch (InterruptedException ignored) {
+                // Ignore interruption during join
+            }
+
+            // Force stop if still alive
+            if (currentOperationThread.isAlive()) {
+                api.logging().logToOutput("Thread still alive after interrupt, clearing reference");
+            }
+
+            currentOperationThread = null; // Clear thread reference
+        }
+
+        clearBulkRetrievalState(); // Use bulk-specific clear method
+        api.logging().logToOutput("Cancellation complete - no new requests should be sent");
+    }
+
+    /**
+     * Cleanup method to properly dispose of resources when extension is unloaded
+     */
+    public void cleanup() {
+        try {
+            // Cancel any running operation
+            cancelOperation();
+
+            api.logging().logToOutput("ActionsTab cleanup completed");
+        } catch (Exception e) {
+            api.logging().logToError("Error during ActionsTab cleanup: " + e.getMessage());
+        }
     }
 }

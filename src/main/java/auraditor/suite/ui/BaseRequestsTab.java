@@ -7,6 +7,7 @@
 package auraditor.suite.ui;
 
 import auraditor.suite.BaseRequest;
+import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.HttpRequestResponse;
@@ -265,7 +266,7 @@ public class BaseRequestsTab {
             mainPanel.repaint();
 
             // Auto-hide after 5 seconds
-            Timer timer = new Timer(5000, e -> {
+            Timer timer = ThreadManager.createManagedTimer(5000, e -> {
                 mainPanel.remove(notificationPanel);
                 mainPanel.revalidate();
                 mainPanel.repaint();
@@ -523,7 +524,7 @@ public class BaseRequestsTab {
         requestTable.setSelectionBackground(Color.ORANGE);
         
         // Create timer to revert back to normal after 1 second
-        Timer timer = new Timer(1000, e -> {
+        Timer timer = ThreadManager.createManagedTimer(1000, e -> {
             requestTable.setSelectionBackground(originalSelectionColor);
         });
         timer.setRepeats(false);
@@ -634,6 +635,22 @@ public class BaseRequestsTab {
             BaseRequest request = baseRequests.get(rowIndex);
             request.setNotes(value.toString());
             fireTableCellUpdated(rowIndex, columnIndex);
+        }
+    }
+
+    /**
+     * Cleanup method to properly dispose of resources when extension is unloaded
+     */
+    public void cleanup() {
+        try {
+            // Clear table data
+            if (baseRequests != null) {
+                baseRequests.clear();
+            }
+
+            api.logging().logToOutput("BaseRequestsTab cleanup completed");
+        } catch (Exception e) {
+            api.logging().logToError("Error during BaseRequestsTab cleanup: " + e.getMessage());
         }
     }
 }
