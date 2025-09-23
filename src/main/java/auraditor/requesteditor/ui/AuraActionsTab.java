@@ -163,8 +163,16 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
         }
         String jsonText = Utils.urlDecode(param.value());
 
+        // Debug logging for multiline JSON issues
+        if (jsonText.contains("\n") || jsonText.contains("\r")) {
+            api.logging().logToOutput("AuraActionsTab: Processing multiline JSON with " +
+                jsonText.split("\\r?\\n").length + " lines");
+        }
+
         try {
-            this.currentAuraMessage = new AuraMessage(jsonText, api);
+            // Try parsing with improved multiline JSON handling
+            String processedJson = preprocessJsonForParsing(jsonText);
+            this.currentAuraMessage = new AuraMessage(processedJson, api);
 
             //create tabs for each aura action
             Iterator<String> iter = currentAuraMessage.actionMap.keySet().iterator();
@@ -187,6 +195,11 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
 
         } catch (JsonProcessingException e) {
             api.logging().logToError("JsonProcessingException in AuraActionsTab: " + e.getMessage());
+            // Log the problematic JSON for debugging multiline issues
+            if (jsonText.contains("\n") || jsonText.contains("\r")) {
+                api.logging().logToError("Problematic multiline JSON (first 500 chars): " +
+                    jsonText.substring(0, Math.min(500, jsonText.length())));
+            }
         } catch (IOException e) {
             api.logging().logToError("IOException in AuraActionsTab: " + e.getMessage());
         }
@@ -382,6 +395,46 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
         } catch (Exception ex) {
             api.logging().logToError("Failed to create new action tab: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Preprocess JSON text to handle multiline beautified JSON issues
+     */
+    private String preprocessJsonForParsing(String jsonText) {
+        if (jsonText == null || jsonText.trim().isEmpty()) {
+            return jsonText;
+        }
+
+        // Already handled basic normalization in Utils.urlDecode(), but add extra safety
+        String processed = jsonText;
+
+        // Handle common issues with multiline JSON in HTTP parameters
+        // 1. Ensure proper line ending normalization
+        processed = processed.replace("\r\n", "\n").replace("\r", "\n");
+
+        // 2. Handle potential encoding artifacts
+        processed = processed.replace("%0A", "\n").replace("%0D", "");
+
+        // 3. Clean up any extra whitespace while preserving JSON structure
+        processed = processed.trim();
+
+        // 4. If JSON appears to be minified on one line but should be multiline,
+        //    attempt to detect and fix formatting issues
+        if (!processed.contains("\n") && processed.length() > 1000) {
+            // Very long single-line JSON might be improperly formatted
+            // Let Jackson parse and reformat it
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper tempMapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode tempNode = tempMapper.readTree(processed);
+                processed = tempMapper.writeValueAsString(tempNode);
+            } catch (Exception e) {
+                // If reformatting fails, use original
+                api.logging().logToOutput("Could not reformat potential minified JSON, using original");
+            }
+        }
+
+        return processed;
     }
 
     /**

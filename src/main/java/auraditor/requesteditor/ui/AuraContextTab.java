@@ -141,6 +141,12 @@ public class AuraContextTab implements ExtensionProvidedHttpRequestEditor, Exten
         
         String contextJson = Utils.urlDecode(contextParam.value());
 
+        // Debug logging for multiline JSON issues
+        if (contextJson.contains("\n") || contextJson.contains("\r")) {
+            api.logging().logToOutput("AuraContextTab: Processing multiline aura.context JSON with " +
+                contextJson.split("\\r?\\n").length + " lines");
+        }
+
         try {
             // Create context panel for editing context directly with the JSON
             contextPanel = new AuraContextPanel(contextJson, editable, api);
@@ -148,6 +154,11 @@ public class AuraContextTab implements ExtensionProvidedHttpRequestEditor, Exten
 
         } catch (Exception e) {
             api.logging().logToError("Exception in AuraContextTab requestSetup: " + e.getMessage());
+            // Log the problematic JSON for debugging multiline issues
+            if (contextJson.contains("\n") || contextJson.contains("\r")) {
+                api.logging().logToError("Problematic multiline aura.context JSON (first 500 chars): " +
+                    contextJson.substring(0, Math.min(500, contextJson.length())));
+            }
         }
     }
 
