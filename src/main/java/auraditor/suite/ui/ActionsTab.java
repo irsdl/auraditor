@@ -220,7 +220,8 @@ public class ActionsTab {
         void createResultTab(String resultId, String content);
         void createDiscoveryResultTab(String resultId, DiscoveryResult discoveryResult);
         void createObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult);
-        
+        void createRecordTab(String recordId, String recordData, BaseRequest baseRequest);
+
         // New method for updating tabs without automatic switching
         default void updateObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult) {
             // Default implementation falls back to createObjectByNameTab
@@ -1465,9 +1466,9 @@ public class ActionsTab {
             // Create the result content for the tab
             String resultContent = formatRecordRetrievalResult(recordId, responseBody);
 
-            // Create the result tab
+            // Create the result tab with request information
             SwingUtilities.invokeLater(() -> {
-                resultTabCallback.createResultTab(resultId, resultContent);
+                resultTabCallback.createRecordTab(recordId, resultContent, baseRequest);
                 clearBusyState();
                 showStatusMessage("✓ Record retrieved successfully: " + recordId, Color.GREEN);
             });
@@ -4072,10 +4073,14 @@ public class ActionsTab {
         private final JSplitPane splitPane;
         private final JList<String> recordList;
         private final JTextArea dataArea;
+        private final BaseRequest baseRequest;
+        private final MontoyaApi api;
 
-        public RetrievedRecordsResultPanel(String recordId, String recordData) {
+        public RetrievedRecordsResultPanel(String recordId, String recordData, BaseRequest baseRequest, MontoyaApi api) {
             this.recordId = recordId;
             this.recordData = recordData;
+            this.baseRequest = baseRequest;
+            this.api = api;
             this.setLayout(new BorderLayout());
 
             // Create shared toolbar
@@ -4114,6 +4119,86 @@ public class ActionsTab {
                     }
                 }
             });
+
+            // Add right-click context menu
+            addMouseListenerToRecordList();
+        }
+
+        /**
+         * Add mouse listener to record list for right-click context menu
+         */
+        private void addMouseListenerToRecordList() {
+            // Remove ALL existing mouse listeners to prevent interference
+            java.awt.event.MouseListener[] existingListeners = recordList.getMouseListeners();
+            for (java.awt.event.MouseListener listener : existingListeners) {
+                recordList.removeMouseListener(listener);
+            }
+
+            // Add a single mouse listener that handles popup properly
+            java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    // Handle selection on any click
+                    handleSelection(e);
+                    // Only show popup on popup trigger
+                    if (e.isPopupTrigger()) {
+                        showContextMenu(e);
+                    }
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    // Only show popup on popup trigger (for Mac compatibility)
+                    if (e.isPopupTrigger()) {
+                        showContextMenu(e);
+                    }
+                }
+
+                private void handleSelection(java.awt.event.MouseEvent e) {
+                    int index = recordList.locationToIndex(e.getPoint());
+                    if (index >= 0 && index < recordList.getModel().getSize()) {
+                        recordList.setSelectedIndex(index);
+                    }
+                }
+
+                private void showContextMenu(java.awt.event.MouseEvent e) {
+                    int index = recordList.locationToIndex(e.getPoint());
+
+                    if (index >= 0 && index < recordList.getModel().getSize()) {
+                        // Ensure item is selected (may already be selected from handleSelection)
+                        if (recordList.getSelectedIndex() != index) {
+                            recordList.setSelectedIndex(index);
+                        }
+                        String selectedValue = recordList.getSelectedValue();
+
+                        javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+
+                        // Only show context menu items if we have baseRequest information
+                        if (baseRequest != null) {
+                            javax.swing.JMenuItem showRequestItem = new javax.swing.JMenuItem("Show HTTP Request");
+                            showRequestItem.addActionListener(action -> showHttpRequest());
+                            popup.add(showRequestItem);
+
+                            javax.swing.JMenuItem sendToRepeaterItem = new javax.swing.JMenuItem("Send to Repeater");
+                            sendToRepeaterItem.addActionListener(action -> sendSelectedToRepeater());
+                            popup.add(sendToRepeaterItem);
+
+                            javax.swing.JMenuItem copyRequestItem = new javax.swing.JMenuItem("Copy HTTP Request");
+                            copyRequestItem.addActionListener(action -> copyHttpRequestToClipboard());
+                            popup.add(copyRequestItem);
+                        } else {
+                            // Show informational message when baseRequest is not available
+                            javax.swing.JMenuItem noRequestItem = new javax.swing.JMenuItem("No request information available");
+                            noRequestItem.setEnabled(false);
+                            popup.add(noRequestItem);
+                        }
+
+                        popup.show(recordList, e.getX(), e.getY());
+                    }
+                }
+            };
+
+            recordList.addMouseListener(mouseAdapter);
         }
 
         @Override
@@ -4207,6 +4292,204 @@ public class ActionsTab {
             model.addElement(recordId);
             recordList.setSelectedIndex(model.getSize() - 1);
             dataArea.setText(recordData);
+        }
+
+        /**
+         * Show HTTP request dialog for the selected record
+         */
+        private void showHttpRequest() {
+            String selectedRecord = recordList.getSelectedValue();
+            if (selectedRecord == null || baseRequest == null) {
+                return;
+            }
+
+            // Create the record retrieval request
+            HttpRequest recordRequest = reconstructRecordRetrievalRequest(baseRequest, selectedRecord);
+            displayHttpRequestDialog(baseRequest, "Record: " + selectedRecord, recordRequest);
+        }
+
+        /**
+         * Send selected record request to Repeater
+         */
+        private void sendSelectedToRepeater() {
+            String selectedRecord = recordList.getSelectedValue();
+            if (selectedRecord == null || baseRequest == null) {
+                return;
+            }
+
+            // Create the record retrieval request
+            HttpRequest recordRequest = reconstructRecordRetrievalRequest(baseRequest, selectedRecord);
+            sendToRepeater(recordRequest, baseRequest.getId());
+        }
+
+        /**
+         * Copy selected record request to clipboard
+         */
+        private void copyHttpRequestToClipboard() {
+            String selectedRecord = recordList.getSelectedValue();
+            if (selectedRecord == null || baseRequest == null) {
+                return;
+            }
+
+            // Create the record retrieval request
+            HttpRequest recordRequest = reconstructRecordRetrievalRequest(baseRequest, selectedRecord);
+            String requestText = formatAsHttpRequest(recordRequest);
+
+            // Copy to clipboard
+            try {
+                java.awt.datatransfer.StringSelection stringSelection = new java.awt.datatransfer.StringSelection(requestText);
+                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
+
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "HTTP request copied to clipboard",
+                        "Copy Successful",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
+            } catch (Exception e) {
+                api.logging().logToError("Failed to copy to clipboard: " + e.getMessage());
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Failed to copy to clipboard: " + e.getMessage(),
+                        "Copy Failed",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
+            }
+        }
+
+        /**
+         * Reconstruct the HTTP request used to retrieve the record
+         */
+        private HttpRequest reconstructRecordRetrievalRequest(BaseRequest baseRequest, String recordId) {
+            // Escape the record ID for JSON
+            String escapedRecordId = recordId.replace("\\", "\\\\").replace("\"", "\\\"");
+
+            // Create the record retrieval payload with the specified format
+            String recordPayload = String.format(
+                "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"serviceComponent://ui.force.components.controllers.detail.DetailController/ACTION$getRecord\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{\"recordId\":\"%s\",\"record\":null,\"inContextOfComponent\":\"\",\"mode\":\"VIEW\",\"layoutType\":\"FULL\",\"defaultFieldValues\":null,\"navigationLocation\":\"LIST_VIEW_ROW\"}}]}",
+                escapedRecordId
+            );
+
+            // Get the original HTTP request
+            HttpRequest originalRequest = baseRequest.getRequestResponse().request();
+
+            // Build new request with modified message parameter
+            String newBody = "message=" + java.net.URLEncoder.encode(recordPayload, java.nio.charset.StandardCharsets.UTF_8) +
+                           "&aura.context=" + extractAuraContext(originalRequest.bodyToString()) +
+                           "&aura.token=" + extractAuraToken(originalRequest.bodyToString());
+
+            // Create the modified HTTP request
+            return originalRequest.withBody(newBody);
+        }
+
+        /**
+         * Extract aura.context from the original request body
+         */
+        private String extractAuraContext(String requestBody) {
+            try {
+                String[] parts = requestBody.split("&");
+                for (String part : parts) {
+                    if (part.startsWith("aura.context=")) {
+                        return part.substring("aura.context=".length());
+                    }
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Failed to extract aura.context: " + e.getMessage());
+            }
+            return "";
+        }
+
+        /**
+         * Extract aura.token from the original request body
+         */
+        private String extractAuraToken(String requestBody) {
+            try {
+                String[] parts = requestBody.split("&");
+                for (String part : parts) {
+                    if (part.startsWith("aura.token=")) {
+                        return part.substring("aura.token=".length());
+                    }
+                }
+            } catch (Exception e) {
+                api.logging().logToError("Failed to extract aura.token: " + e.getMessage());
+            }
+            return "";
+        }
+
+        /**
+         * Display HTTP request in a dialog similar to ObjectByNameResultPanel
+         */
+        private void displayHttpRequestDialog(BaseRequest baseRequest, String title, HttpRequest request) {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                javax.swing.JDialog dialog = new javax.swing.JDialog();
+                dialog.setTitle("HTTP Request - " + title);
+                dialog.setModal(true);
+                dialog.setSize(800, 600);
+                dialog.setLocationRelativeTo(this);
+
+                javax.swing.JTextArea textArea = new javax.swing.JTextArea();
+                textArea.setEditable(false);
+                textArea.setFont(new java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12));
+                textArea.setText(formatAsHttpRequest(request));
+
+                javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(textArea);
+                dialog.add(scrollPane);
+
+                dialog.setVisible(true);
+            });
+        }
+
+        /**
+         * Send request to Repeater similar to ObjectByNameResultPanel
+         */
+        private void sendToRepeater(HttpRequest httpRequest, int requestId) {
+            try {
+                api.repeater().sendToRepeater(httpRequest, "Record Request " + requestId);
+
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Request sent to Repeater successfully",
+                        "Repeater",
+                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
+                });
+            } catch (Exception e) {
+                api.logging().logToError("Failed to send to Repeater: " + e.getMessage());
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                        "Failed to send to Repeater: " + e.getMessage(),
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+                });
+            }
+        }
+
+        /**
+         * Format HTTP request as text similar to ObjectByNameResultPanel
+         */
+        private String formatAsHttpRequest(HttpRequest request) {
+            StringBuilder sb = new StringBuilder();
+
+            // Request line
+            sb.append(request.method()).append(" ").append(request.path());
+            if (request.query() != null && !request.query().isEmpty()) {
+                sb.append("?").append(request.query());
+            }
+            sb.append(" HTTP/1.1\n");
+
+            // Headers
+            for (burp.api.montoya.http.message.HttpHeader header : request.headers()) {
+                sb.append(header.name()).append(": ").append(header.value()).append("\n");
+            }
+
+            // Empty line before body
+            sb.append("\n");
+
+            // Body
+            if (request.body().length() > 0) {
+                sb.append(request.bodyToString());
+            }
+
+            return sb.toString();
         }
 
         @Override

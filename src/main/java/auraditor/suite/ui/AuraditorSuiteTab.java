@@ -74,6 +74,11 @@ public class AuraditorSuiteTab {
                 AuraditorSuiteTab.this.updateObjectByNameTabWithoutSwitching(resultId, objectByNameResult);
             }
 
+            @Override
+            public void createRecordTab(String recordId, String recordData, BaseRequest baseRequest) {
+                AuraditorSuiteTab.this.createRecordTab(recordId, recordData, baseRequest);
+            }
+
             public void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
                 AuraditorSuiteTab.this.createRetrievedRecordsTab(resultId, recordId, recordData);
             }
@@ -260,6 +265,55 @@ public class AuraditorSuiteTab {
     }
 
     /**
+     * Create a new retrieved records result tab with context menu support
+     */
+    private void createRecordTab(String recordId, String recordData, BaseRequest baseRequest) {
+        SwingUtilities.invokeLater(() -> {
+            // Remove "No Results" tab if it exists
+            if (resultsTabbedPane.getTabCount() == 1 &&
+                "No Results".equals(resultsTabbedPane.getTitleAt(0))) {
+                resultsTabbedPane.removeTabAt(0);
+            }
+
+            // Check if a "Retrieved Records" tab already exists
+            ActionsTab.RetrievedRecordsResultPanel existingPanel = null;
+            int existingTabIndex = -1;
+
+            for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
+                String tabTitle = resultsTabbedPane.getTitleAt(i);
+                if ("Retrieved Records".equals(tabTitle)) {
+                    Component component = resultsTabbedPane.getComponentAt(i);
+                    if (component instanceof ActionsTab.RetrievedRecordsResultPanel) {
+                        existingPanel = (ActionsTab.RetrievedRecordsResultPanel) component;
+                        existingTabIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (existingPanel != null) {
+                // Add to existing tab
+                existingPanel.addRecord(recordId, recordData);
+                // Switch to the existing tab
+                resultsTabbedPane.setSelectedIndex(existingTabIndex);
+            } else {
+                // Create new tab with context menu support
+                ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel =
+                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, baseRequest, api);
+
+                // Add the new result tab with a fixed name for accumulation
+                resultsTabbedPane.addTab("Retrieved Records", retrievedRecordsPanel);
+
+                // Switch to the new tab
+                resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
+            }
+
+            // Switch to Results tab in main tabbed pane
+            tabbedPane.setSelectedIndex(2); // Results tab index
+        });
+    }
+
+    /**
      * Create a new retrieved records result tab with raw data or add to existing tab
      */
     private void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
@@ -293,8 +347,9 @@ public class AuraditorSuiteTab {
                 // Switch to the existing tab
                 resultsTabbedPane.setSelectedIndex(existingTabIndex);
             } else {
-                // Create new tab
-                ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel = new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData);
+                // Create new tab without context menu support (legacy method)
+                ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel =
+                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, null, api);
 
                 // Add the new result tab with a fixed name for accumulation
                 resultsTabbedPane.addTab("Retrieved Records", retrievedRecordsPanel);
