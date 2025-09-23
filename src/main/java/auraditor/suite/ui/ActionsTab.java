@@ -2385,7 +2385,6 @@ public class ActionsTab {
         protected JCheckBox searchRegexCheckBox;
         protected JCheckBox filterRegexCheckBox;
         protected JCheckBox hideEmptyCheckBox;
-        protected JButton searchBtn;
         protected JButton searchNextBtn;
         protected JButton searchPrevBtn;
         protected JButton resetBtn;
@@ -2396,6 +2395,7 @@ public class ActionsTab {
         protected int currentSearchIndex = -1;
         protected List<Integer> searchMatches = new ArrayList<>();
         protected String lastSearchText = "";
+        protected int lastCursorPosition = 0;
 
         /**
          * Create the shared toolbar with all common functionality
@@ -2423,10 +2423,10 @@ public class ActionsTab {
             this.searchRegexCheckBox = new JCheckBox("Regex");
             searchPanel.add(searchRegexCheckBox);
 
-            this.searchBtn = new JButton("Search");
             this.searchNextBtn = new JButton("Next");
             this.searchPrevBtn = new JButton("Prev");
-            searchPanel.add(searchBtn);
+            searchNextBtn.setEnabled(false);
+            searchPrevBtn.setEnabled(false);
             searchPanel.add(searchNextBtn);
             searchPanel.add(searchPrevBtn);
 
@@ -2469,25 +2469,38 @@ public class ActionsTab {
             // Export button
             exportBtn.addActionListener(e -> performExport());
 
-            // Search button - trigger search when clicked
-            searchBtn.addActionListener(e -> {
-                if (!searchField.getText().trim().isEmpty()) {
-                    performSearch();
-                } else {
-                    clearSearchHighlighting();
-                    updateSearchStatus("Enter search text");
+            // Search field - update search results on text change
+            javax.swing.Timer searchTimer = ThreadManager.createManagedTimer(300, e -> updateSearchResults());
+            searchTimer.setRepeats(false);
+
+            searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+                @Override
+                public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
+                }
+                @Override
+                public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
+                }
+                @Override
+                public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                    searchTimer.restart();
                 }
             });
 
-            // Allow Enter key in search field to trigger search
-            searchField.addActionListener(e -> searchBtn.doClick());
+            // Allow Enter key in search field to trigger next search
+            searchField.addActionListener(e -> {
+                if (!searchField.getText().trim().isEmpty() && !searchMatches.isEmpty()) {
+                    navigateSearch(true);
+                }
+            });
 
             // Search navigation buttons
             searchNextBtn.addActionListener(e -> navigateSearch(true));
             searchPrevBtn.addActionListener(e -> navigateSearch(false));
 
             // Search regex checkbox
-            searchRegexCheckBox.addActionListener(e -> performSearch());
+            searchRegexCheckBox.addActionListener(e -> updateSearchResults());
 
             // Filter field - trigger filter on text change with delay
             javax.swing.Timer filterTimer = ThreadManager.createManagedTimer(300, e -> applyFilter());
@@ -2523,9 +2536,11 @@ public class ActionsTab {
          */
         protected void navigateSearch(boolean next) {
             if (searchMatches.isEmpty()) {
-                performSearch(); // Try to search if no matches yet
-                return;
+                return; // No search results available
             }
+
+            // Save current cursor position before navigation
+            lastCursorPosition = getCursorPosition();
 
             if (next) {
                 currentSearchIndex = (currentSearchIndex + 1) % searchMatches.size();
@@ -2553,6 +2568,10 @@ public class ActionsTab {
             updateSearchStatus(" ");
             // Clear any highlighting in the searchable component
             clearSearchHighlighting();
+            // Restore cursor position if we have one saved
+            if (lastCursorPosition > 0) {
+                setCursorPosition(lastCursorPosition);
+            }
         }
 
         /**
@@ -2574,12 +2593,44 @@ public class ActionsTab {
             return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
         }
 
+        /**
+         * Update search results when search text changes
+         */
+        protected void updateSearchResults() {
+            String searchText = searchField.getText().trim();
+
+            if (searchText.isEmpty()) {
+                clearSearch();
+                searchNextBtn.setEnabled(false);
+                searchPrevBtn.setEnabled(false);
+                return;
+            }
+
+            // Perform search and update matches
+            performSearch();
+
+            // Enable/disable navigation buttons based on results
+            boolean hasMatches = !searchMatches.isEmpty();
+            searchNextBtn.setEnabled(hasMatches);
+            searchPrevBtn.setEnabled(hasMatches);
+
+            if (hasMatches) {
+                currentSearchIndex = 0;
+                highlightCurrentMatch();
+                updateSearchStatus("1 of " + searchMatches.size());
+            } else {
+                updateSearchStatus("No matches found");
+            }
+        }
+
         // Abstract methods that subclasses must implement
         protected abstract void performSearch();
         protected abstract void applyFilter();
         protected abstract void performExport();
         protected abstract void highlightCurrentMatch();
         protected abstract void clearSearchHighlighting();
+        protected abstract int getCursorPosition();
+        protected abstract void setCursorPosition(int position);
     }
 
     /**
@@ -3007,6 +3058,20 @@ public class ActionsTab {
         protected String sanitizeFilename(String filename) {
             if (filename == null) return "unknown";
             return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
+        }
+
+        @Override
+        protected int getCursorPosition() {
+            return objectListArea.getCaretPosition();
+        }
+
+        @Override
+        protected void setCursorPosition(int position) {
+            try {
+                objectListArea.setCaretPosition(Math.min(position, objectListArea.getText().length()));
+            } catch (IllegalArgumentException e) {
+                objectListArea.setCaretPosition(0);
+            }
         }
     }
     
@@ -3982,6 +4047,20 @@ public class ActionsTab {
             return sanitized;
         }
 
+        @Override
+        protected int getCursorPosition() {
+            return jsonDataArea.getCaretPosition();
+        }
+
+        @Override
+        protected void setCursorPosition(int position) {
+            try {
+                jsonDataArea.setCaretPosition(Math.min(position, jsonDataArea.getText().length()));
+            } catch (IllegalArgumentException e) {
+                jsonDataArea.setCaretPosition(0);
+            }
+        }
+
     }
 
     /**
@@ -4128,6 +4207,20 @@ public class ActionsTab {
             model.addElement(recordId);
             recordList.setSelectedIndex(model.getSize() - 1);
             dataArea.setText(recordData);
+        }
+
+        @Override
+        protected int getCursorPosition() {
+            return dataArea.getCaretPosition();
+        }
+
+        @Override
+        protected void setCursorPosition(int position) {
+            try {
+                dataArea.setCaretPosition(Math.min(position, dataArea.getText().length()));
+            } catch (IllegalArgumentException e) {
+                dataArea.setCaretPosition(0);
+            }
         }
     }
 
