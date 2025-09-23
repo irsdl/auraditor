@@ -2897,12 +2897,16 @@ public class ActionsTab {
             
             // Update the list model
             categoryList.setModel(filteredCategoryModel);
-            
-            // Select first item if available
+
+            // Select first item if available, or clear right panel if no items
             if (filteredCategoryModel.getSize() > 0) {
                 categoryList.setSelectedIndex(0);
+            } else {
+                // Clear the right panel when no categories match the filter
+                objectListArea.setText("");
+                clearSearchHighlighting(); // Also clear any search highlighting
             }
-            
+
             // Update reset button state
             resetBtn.setEnabled(isFiltered);
         }
