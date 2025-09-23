@@ -304,7 +304,7 @@ public class ActionsTab {
         this.findAllObjectsBtn = new JButton("Analyze All Objects");
         this.findObjectByNameBtn = new JButton("Find by Name");
         this.objectNameField = new JTextField(15);
-        this.threadCountSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 10, 1));
+        this.threadCountSpinner = new JSpinner(new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1));
         this.findDefaultObjectsPresetBtn = new JButton("Scan with Wordlist");
         this.selectWordlistBtn = new JButton("Choose File...");
         this.usePresetWordlistCheckbox = new JCheckBox("Use built-in wordlist", true);
