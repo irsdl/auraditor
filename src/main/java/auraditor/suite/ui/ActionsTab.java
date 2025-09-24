@@ -4469,13 +4469,7 @@ public class ActionsTab {
         private void sendToRepeater(HttpRequest httpRequest, int requestId) {
             try {
                 api.repeater().sendToRepeater(httpRequest, "Record Request " + requestId);
-
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(this,
-                        "Request sent to Repeater successfully",
-                        "Repeater",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
+                api.logging().logToOutput("Sent record request " + requestId + " to Repeater");
             } catch (Exception e) {
                 api.logging().logToError("Failed to send to Repeater: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {

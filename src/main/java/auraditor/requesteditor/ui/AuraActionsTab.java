@@ -157,11 +157,21 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
             return;
 
         this.cleanTab();
+
+        // Try standard parameter extraction first
         HttpParameter param = request.parameter(AURA_DATAPARAM, HttpParameterType.BODY);
-        if (param == null) {
+        String jsonText = null;
+
+        if (param != null) {
+            jsonText = Utils.urlDecode(param.value());
+        } else {
+            // Fallback: manually parse body for multiline parameter values
+            jsonText = extractParameterFromBody(request.bodyToString(), AURA_DATAPARAM);
+        }
+
+        if (jsonText == null || jsonText.trim().isEmpty()) {
             return;
         }
-        String jsonText = Utils.urlDecode(param.value());
 
         // Debug logging for multiline JSON issues
         if (jsonText.contains("\n") || jsonText.contains("\r")) {
@@ -395,6 +405,38 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
         } catch (Exception ex) {
             api.logging().logToError("Failed to create new action tab: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Extract parameter value from raw body when standard parameter parsing fails
+     * This handles cases where multiline content breaks the parameter parser
+     */
+    private String extractParameterFromBody(String body, String paramName) {
+        if (body == null || body.trim().isEmpty()) {
+            return null;
+        }
+
+        // URL form encoded data: param1=value1&param2=value2
+        // Look for paramName= in the body
+        String searchPattern = paramName + "=";
+        int startIndex = body.indexOf(searchPattern);
+
+        if (startIndex == -1) {
+            return null;
+        }
+
+        startIndex += searchPattern.length();
+
+        // Find the next & or end of string to determine parameter value end
+        int endIndex = body.indexOf('&', startIndex);
+        if (endIndex == -1) {
+            endIndex = body.length();
+        }
+
+        String paramValue = body.substring(startIndex, endIndex);
+
+        // URL decode the extracted value
+        return Utils.urlDecode(paramValue);
     }
 
     /**
