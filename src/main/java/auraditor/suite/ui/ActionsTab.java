@@ -1685,7 +1685,7 @@ public class ActionsTab {
                 jsonData = "No data found for object '" + objectName + "'\nResult: []";
             } else {
                 StringBuilder jsonContent = new StringBuilder();
-                jsonContent.append("Records found: ").append(resultArray.size()).append("\n\n");
+                jsonContent.append("Records found in ").append(objectName).append(" object: ").append(resultArray.size()).append("\n\n");
                 jsonContent.append("JSON Result Data:\n");
                 jsonContent.append("──────────────────\n\n");
                 
@@ -1729,7 +1729,7 @@ public class ActionsTab {
                     showStatusMessage("✓ Found " + resultArray.size() + " records for object '" + objectName + "' - " + resultId, Color.GREEN);
                     api.logging().logToOutput("Specific object search completed successfully:");
                     api.logging().logToOutput("  Object: " + objectName);
-                    api.logging().logToOutput("  Records found: " + resultArray.size());
+                    api.logging().logToOutput("  Records found in " + objectName + " object: " + resultArray.size());
                 }
             });
             
@@ -1787,7 +1787,7 @@ public class ActionsTab {
                 jsonData = "No data found for object '" + objectName + "'\nResult: []";
             } else {
                 StringBuilder jsonContent = new StringBuilder();
-                jsonContent.append("Records found: ").append(resultArray.size()).append("\n\n");
+                jsonContent.append("Records found in ").append(objectName).append(" object: ").append(resultArray.size()).append("\n\n");
                 jsonContent.append("JSON Result Data:\n");
                 jsonContent.append("──────────────────\n\n");
                 
@@ -1862,7 +1862,7 @@ public class ActionsTab {
             } else {
                 // Object found - format the JSON result data
                 StringBuilder jsonContent = new StringBuilder();
-                jsonContent.append("Records found: ").append(resultArray.size()).append("\n\n");
+                jsonContent.append("Records found in ").append(objectName).append(" object: ").append(resultArray.size()).append("\n\n");
                 jsonContent.append("JSON Result Data:\n");
                 jsonContent.append("──────────────────\n\n");
                 
