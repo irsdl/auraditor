@@ -172,7 +172,7 @@ public class ActionPanel extends JPanel {
 		@Override
 		public String getSelectedText() {
 			if (editor.selection().isPresent()) {
-				return editor.selection().get().contents();
+				return editor.selection().get().contents().toString();
 			}
 			return null;
 		}
