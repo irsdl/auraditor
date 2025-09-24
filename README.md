@@ -120,3 +120,18 @@ JAR files include the full version: `auraditor-2.0.1.jar`
 - ⚠️ **No Official Support**: Community-driven development, use at your own risk
 
 The original [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) repository is archived and no longer maintained.
+
+## Additional Resources & Inspiration
+
+### Recommended Reading
+- [**Salesforce Penetration Testing Fundamentals**](https://projectblack.io/blog/salesforce-penetration-testing-fundamentals/) - Comprehensive guide to Salesforce security testing methodologies
+- [**Exposing Broken Access Controls in Salesforce-based Applications**](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/) - In-depth analysis of access control vulnerabilities in Salesforce applications
+- [**Misconfigured Salesforce Experiences**](https://www.varonis.com/blog/misconfigured-salesforce-experiences) - Common misconfigurations and security issues in Salesforce implementations
+
+### Acknowledgments & Inspiration
+Special thanks to the following projects for inspiration and advancing Salesforce security testing:
+
+- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
+- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
+
+These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
