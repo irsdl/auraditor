@@ -11,85 +11,97 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import burp.api.montoya.MontoyaApi;
-import burp.api.montoya.ui.editor.RawEditor;
 
 @SuppressWarnings("serial")
 public class ActionPanel extends JPanel {
-	public RawEditor rawEditor;
-	public JTextArea textEditor; // Keep for backwards compatibility with existing code
-
-	public ActionPanel(MontoyaApi api){
-		// Create Burp's RawEditor for JSON syntax highlighting and line numbers
-		this.rawEditor = api.userInterface().createRawEditor();
-
-		// Create a compatibility wrapper for existing code that expects JTextArea
-		setupCompatibilityWrapper();
-	}
-
-	/**
-	 * Get the RawEditor component for adding to layouts
-	 */
-	public java.awt.Component getEditorComponent() {
-		return rawEditor.uiComponent();
+	public JTextArea textEditor;
+	
+	public ActionPanel(){
+		this.textEditor = new JTextArea();
+		// Enable line wrapping for better JSON readability
+		this.textEditor.setLineWrap(true);
+		this.textEditor.setWrapStyleWord(true);
+		
+		// Add custom context menu
+		setupContextMenu();
 	}
 	
 	/**
-	 * Setup compatibility wrapper to make existing code work with RawEditor
-	 */
-	private void setupCompatibilityWrapper() {
-		// Create a proxy JTextArea that delegates to RawEditor
-		this.textEditor = new JTextArea() {
-			@Override
-			public void setText(String text) {
-				rawEditor.setContents(burp.api.montoya.core.ByteArray.byteArray(text));
-			}
-
-			@Override
-			public String getText() {
-				return rawEditor.getContents().toString();
-			}
-
-			@Override
-			public void setEditable(boolean editable) {
-				rawEditor.setEditable(editable);
-			}
-
-			@Override
-			public boolean isEditable() {
-				// RawEditor doesn't expose isEditable method, track state ourselves
-				return true; // Assume editable for now
-			}
-
-			@Override
-			public String getSelectedText() {
-				java.util.Optional<burp.api.montoya.ui.Selection> selection = rawEditor.selection();
-				return selection.isPresent() ? selection.get().contents().toString() : null;
-			}
-
-			@Override
-			public void cut() {
-				// RawEditor handles cut/copy/paste through standard UI
-			}
-
-			@Override
-			public void copy() {
-				// RawEditor handles cut/copy/paste through standard UI
-			}
-
-			@Override
-			public void paste() {
-				// RawEditor handles cut/copy/paste through standard UI
-			}
-		};
-	}
-
-	/**
-	 * Setup custom right-click context menu (now handled by RawEditor automatically)
+	 * Setup custom right-click context menu for the text editor
 	 */
 	private void setupContextMenu() {
-		// RawEditor provides built-in context menus with cut/copy/paste/etc.
-		// No additional setup needed
+		JPopupMenu contextMenu = new JPopupMenu();
+		
+		// Cut menu item
+		JMenuItem cutItem = new JMenuItem("Cut");
+		cutItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				textEditor.cut();
+			}
+		});
+		
+		// Copy menu item
+		JMenuItem copyItem = new JMenuItem("Copy");
+		copyItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				textEditor.copy();
+			}
+		});
+		
+		// Paste menu item
+		JMenuItem pasteItem = new JMenuItem("Paste");
+		pasteItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				textEditor.paste();
+			}
+		});
+		
+		// Separator
+		contextMenu.addSeparator();
+		
+		// Toggle line wrapping menu item
+		JMenuItem toggleWrapItem = new JMenuItem("Toggle Line Wrapping");
+		toggleWrapItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				boolean currentWrap = textEditor.getLineWrap();
+				textEditor.setLineWrap(!currentWrap);
+				textEditor.setWrapStyleWord(!currentWrap);
+			}
+		});
+		
+		// Add items to menu
+		contextMenu.add(cutItem);
+		contextMenu.add(copyItem);
+		contextMenu.add(pasteItem);
+		contextMenu.add(toggleWrapItem);
+		
+		// Add mouse listener to show context menu
+		textEditor.addMouseListener(new MouseAdapter() {
+			@Override
+			public void mousePressed(MouseEvent e) {
+				maybeShowPopup(e);
+			}
+			
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				maybeShowPopup(e);
+			}
+			
+			private void maybeShowPopup(MouseEvent e) {
+				if (e.isPopupTrigger()) {
+					// Update menu item states based on current selection and clipboard
+					cutItem.setEnabled(textEditor.getSelectedText() != null && textEditor.isEditable());
+					copyItem.setEnabled(textEditor.getSelectedText() != null);
+					pasteItem.setEnabled(textEditor.isEditable());
+					
+					contextMenu.show(e.getComponent(), e.getX(), e.getY());
+				}
+			}
+		});
 	}
 	
 	public byte[] getSelectedText(){
