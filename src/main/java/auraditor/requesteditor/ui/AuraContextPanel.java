@@ -39,7 +39,7 @@ public class AuraContextPanel extends ActionPanel {
     }
 
     public AuraContextPanel(AuraMessage auraMessage, boolean editable, MontoyaApi api) {
-        super();
+        super(api);
         this.auraMessage = auraMessage;
         this.api = api;
         this.editable = editable;
@@ -51,14 +51,19 @@ public class AuraContextPanel extends ActionPanel {
         this.setLayout(panelLayout);
         createBurpTextPane(contextJson);
 
-        this.add(new javax.swing.JScrollPane(this.textEditor));
+        // Add the appropriate component based on editor type
+        if (this.textEditor instanceof ActionPanel.HttpRequestEditorWrapper) {
+            this.add(((ActionPanel.HttpRequestEditorWrapper) this.textEditor).getComponent());
+        } else {
+            this.add(new javax.swing.JScrollPane(this.textEditor));
+        }
     }
 
     /**
      * Constructor for raw context JSON (from aura.context parameter)
      */
     public AuraContextPanel(String contextJson, boolean editable, MontoyaApi api) {
-        super();
+        super(api);
         this.auraMessage = null; // No AuraMessage since we're working with raw context
         this.api = api;
         this.editable = editable;
@@ -69,7 +74,12 @@ public class AuraContextPanel extends ActionPanel {
         this.setLayout(panelLayout);
         createBurpTextPane(formatContextJson(contextJson));
 
-        this.add(new javax.swing.JScrollPane(this.textEditor));
+        // Add the appropriate component based on editor type
+        if (this.textEditor instanceof ActionPanel.HttpRequestEditorWrapper) {
+            this.add(((ActionPanel.HttpRequestEditorWrapper) this.textEditor).getComponent());
+        } else {
+            this.add(new javax.swing.JScrollPane(this.textEditor));
+        }
     }
 
     /**

@@ -11,13 +11,28 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.ui.editor.HttpRequestEditor;
+import burp.api.montoya.http.message.requests.HttpRequest;
 
 @SuppressWarnings("serial")
 public class ActionPanel extends JPanel {
-	public JTextArea textEditor;
-	
+	public HttpRequestEditor httpEditor;
+	public JTextArea textEditor; // Compatibility wrapper
+	private MontoyaApi api;
+
 	public ActionPanel(){
-		this.textEditor = new JTextArea();
+		this(null);
+	}
+
+	public ActionPanel(MontoyaApi api){
+		this.api = api;
+		if (api != null) {
+			this.httpEditor = api.userInterface().createHttpRequestEditor();
+			this.textEditor = new HttpRequestEditorWrapper(httpEditor);
+		} else {
+			this.textEditor = new JTextArea();
+		}
 		// Enable line wrapping for better JSON readability
 		this.textEditor.setLineWrap(true);
 		this.textEditor.setWrapStyleWord(true);
@@ -80,7 +95,10 @@ public class ActionPanel extends JPanel {
 		contextMenu.add(toggleWrapItem);
 		
 		// Add mouse listener to show context menu
-		textEditor.addMouseListener(new MouseAdapter() {
+		JComponent editorComponent = (textEditor instanceof HttpRequestEditorWrapper)
+				? ((HttpRequestEditorWrapper) textEditor).getComponent()
+				: textEditor;
+		editorComponent.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
 				maybeShowPopup(e);
@@ -107,5 +125,100 @@ public class ActionPanel extends JPanel {
 	public byte[] getSelectedText(){
 		String selectedText = textEditor.getSelectedText();
 		return selectedText != null ? selectedText.getBytes() : null;
+	}
+
+	/**
+	 * Wrapper class to provide JTextArea compatibility for HttpRequestEditor
+	 */
+	public class HttpRequestEditorWrapper extends JTextArea {
+		private final HttpRequestEditor editor;
+		private HttpRequest currentRequest;
+
+		public HttpRequestEditorWrapper(HttpRequestEditor editor) {
+			this.editor = editor;
+			// Create a default HTTP request template for JSON content
+			this.currentRequest = HttpRequest.httpRequestFromUrl("http://example.com")
+					.withBody("{}");
+			this.editor.setRequest(currentRequest);
+		}
+
+		@Override
+		public void setText(String text) {
+			if (text == null) text = "";
+
+			// Create HTTP request with JSON body
+			String httpRequestString = "POST /aura HTTP/1.1\r\n" +
+					"Host: example.com\r\n" +
+					"Content-Type: application/json\r\n" +
+					"Content-Length: " + text.getBytes().length + "\r\n" +
+					"\r\n" + text;
+
+			try {
+				this.currentRequest = HttpRequest.httpRequest(httpRequestString);
+				editor.setRequest(currentRequest);
+			} catch (Exception e) {
+				// Fallback to simple request if parsing fails
+				this.currentRequest = HttpRequest.httpRequestFromUrl("http://example.com")
+						.withBody(text);
+				editor.setRequest(currentRequest);
+			}
+		}
+
+		@Override
+		public String getText() {
+			return editor.getRequest().body().toString();
+		}
+
+		@Override
+		public String getSelectedText() {
+			if (editor.selection().isPresent()) {
+				return editor.selection().get().contents();
+			}
+			return null;
+		}
+
+		@Override
+		public void setEditable(boolean editable) {
+			// HttpRequestEditor is always editable, so we ignore this
+		}
+
+		@Override
+		public boolean isEditable() {
+			return true;
+		}
+
+		@Override
+		public void cut() {
+			// Not directly supported by HttpRequestEditor
+		}
+
+		@Override
+		public void copy() {
+			// Not directly supported by HttpRequestEditor
+		}
+
+		@Override
+		public void paste() {
+			// Not directly supported by HttpRequestEditor
+		}
+
+		@Override
+		public void setLineWrap(boolean wrap) {
+			// Not applicable to HttpRequestEditor
+		}
+
+		@Override
+		public boolean getLineWrap() {
+			return false;
+		}
+
+		@Override
+		public void setWrapStyleWord(boolean word) {
+			// Not applicable to HttpRequestEditor
+		}
+
+		public JComponent getComponent() {
+			return (JComponent) editor.uiComponent();
+		}
 	}
 }
