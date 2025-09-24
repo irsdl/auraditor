@@ -156,7 +156,9 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
         String jsonText = Utils.urlDecode(param.value());
 
         try {
-            this.currentAuraMessage = new AuraMessage(jsonText, api);
+            // Apply CRLF preprocessing to handle multiline JSON properly
+            String processedJson = preprocessJsonForParsing(jsonText);
+            this.currentAuraMessage = new AuraMessage(processedJson, api);
 
             //create tabs for each aura action
             Iterator<String> iter = currentAuraMessage.actionMap.keySet().iterator();
@@ -315,5 +317,45 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
             }
             return null;
         }
+    }
+
+    /**
+     * Preprocess JSON text to handle multiline beautified JSON issues
+     */
+    private String preprocessJsonForParsing(String jsonText) {
+        if (jsonText == null || jsonText.trim().isEmpty()) {
+            return jsonText;
+        }
+
+        // Already handled basic normalization in Utils.urlDecode(), but add extra safety
+        String processed = jsonText;
+
+        // Handle common issues with multiline JSON in HTTP parameters
+        // 1. Ensure proper line ending normalization
+        processed = processed.replace("\r\n", "\n").replace("\r", "\n");
+
+        // 2. Handle potential encoding artifacts
+        processed = processed.replace("%0A", "\n").replace("%0D", "");
+
+        // 3. Clean up any extra whitespace while preserving JSON structure
+        processed = processed.trim();
+
+        // 4. If JSON appears to be minified on one line but should be multiline,
+        //    attempt to detect and fix formatting issues
+        if (!processed.contains("\n") && processed.length() > 1000) {
+            // Very long single-line JSON might be improperly formatted
+            // Let Jackson parse and reformat it
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper tempMapper =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode tempNode = tempMapper.readTree(processed);
+                processed = tempMapper.writeValueAsString(tempNode);
+            } catch (Exception e) {
+                // If reformatting fails, use original
+                api.logging().logToOutput("Could not reformat potential minified JSON, using original");
+            }
+        }
+
+        return processed;
     }
 }
