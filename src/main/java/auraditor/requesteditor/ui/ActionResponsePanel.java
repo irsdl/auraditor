@@ -19,10 +19,10 @@ public class ActionResponsePanel extends ActionPanel {
 	private MontoyaApi api;
 	
 	public ActionResponsePanel(ActionResponse response, MontoyaApi api){
-		super();
+		super(api);
 		this.api = api;
 		this.setLayout(new BorderLayout());
-		
+
 		this.textEditor.setEditable(false);
 		try {
 			this.textEditor.setText(response.getResponseString());
@@ -30,6 +30,7 @@ public class ActionResponsePanel extends ActionPanel {
 			api.logging().logToError("JsonProcessingException: " + e.getMessage());
 			this.textEditor.setText("Invalid JSON");
 		}
-		add(new javax.swing.JScrollPane(this.textEditor));
+		// Add RawEditor component to the panel
+		this.add(this.getEditorComponent(), BorderLayout.CENTER);
 	}
 }

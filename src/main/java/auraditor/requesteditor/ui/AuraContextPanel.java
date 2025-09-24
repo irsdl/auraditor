@@ -39,11 +39,11 @@ public class AuraContextPanel extends ActionPanel {
     }
 
     public AuraContextPanel(AuraMessage auraMessage, boolean editable, MontoyaApi api) {
-        super();
+        super(api);
         this.auraMessage = auraMessage;
         this.api = api;
         this.editable = editable;
-        
+
         String contextJson = getContextJson();
         BorderLayout panelLayout = new BorderLayout();
         panelLayout.setVgap(5);
@@ -51,25 +51,27 @@ public class AuraContextPanel extends ActionPanel {
         this.setLayout(panelLayout);
         createBurpTextPane(contextJson);
 
-        this.add(new javax.swing.JScrollPane(this.textEditor));
+        // Add RawEditor component to the panel
+        this.add(this.getEditorComponent());
     }
 
     /**
      * Constructor for raw context JSON (from aura.context parameter)
      */
     public AuraContextPanel(String contextJson, boolean editable, MontoyaApi api) {
-        super();
+        super(api);
         this.auraMessage = null; // No AuraMessage since we're working with raw context
         this.api = api;
         this.editable = editable;
-        
+
         BorderLayout panelLayout = new BorderLayout();
         panelLayout.setVgap(5);
 
         this.setLayout(panelLayout);
         createBurpTextPane(formatContextJson(contextJson));
 
-        this.add(new javax.swing.JScrollPane(this.textEditor));
+        // Add RawEditor component to the panel
+        this.add(this.getEditorComponent());
     }
 
     /**

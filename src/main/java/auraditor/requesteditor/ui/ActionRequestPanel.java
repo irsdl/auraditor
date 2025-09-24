@@ -48,7 +48,7 @@ public class ActionRequestPanel extends ActionPanel {
     }
 
     public ActionRequestPanel(ActionRequest ar, boolean editable, MontoyaApi api) {
-        super();
+        super(api);
         this.actionRequest = ar;
         this.api = api;
         JsonNode params = ar.getParams();
@@ -62,7 +62,7 @@ public class ActionRequestPanel extends ActionPanel {
         this.add(headerPanel, BorderLayout.PAGE_START);
         createBurpTextPane(pretty);
 
-        this.add(new javax.swing.JScrollPane(this.textEditor));
+        this.add(this.getEditorComponent());
     }
 
     public String getPrettyPrintedParams(JsonNode params) {
