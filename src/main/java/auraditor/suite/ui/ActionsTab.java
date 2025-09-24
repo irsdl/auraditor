@@ -694,40 +694,22 @@ public class ActionsTab {
      * Get user's choice for tab handling when adding to existing retrieved objects
      */
     private String getUserTabChoice() {
-        // If user prefers to always create new tabs, bypass dialog
+        // Check if there are existing retrieved objects tabs
+        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
+
+        // If user prefers to always create new tabs, always create new
         if (alwaysCreateNewTabCheckbox.isSelected()) {
             objectByNameResults = new ObjectByNameResult();
             return generateRetrievedObjectsResultId();
         }
 
-        // Check if there are existing retrieved objects tabs
-        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
-
-        // If no existing tabs, automatically create new tab (avoid UI friction)
-        if (!hasExistingTabs) {
-            objectByNameResults = new ObjectByNameResult();
-            return generateRetrievedObjectsResultId();
-        }
-
-        // Show dialog asking user preference only when tabs exist
-        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
-        Object[] options = {"Append to current tab (" + lastTabId + ")", "Create new tab"};
-        int choice = JOptionPane.showOptionDialog(
-            mainPanel,
-            "You already have retrieved objects. How would you like to proceed?",
-            "Tab Selection",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]
-        );
-        
-        if (choice == 0) {
-            // Append to existing tab
+        // If checkbox is unchecked, prefer appending to existing tabs
+        if (hasExistingTabs) {
+            // Append to existing tab automatically
+            String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
             return lastTabId;
         } else {
-            // Create new tab and reset object results
+            // No existing tabs, create new tab
             objectByNameResults = new ObjectByNameResult();
             return generateRetrievedObjectsResultId();
         }
@@ -737,67 +719,29 @@ public class ActionsTab {
      * Get user's choice for tab handling when performing bulk retrieval
      */
     private String getUserTabChoiceForBulkRetrieval(String objectType, int objectCount) {
-        // If user prefers to always create new tabs, bypass dialog
+        // Check if there are existing retrieved objects tabs
+        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
+
+        // If user prefers to always create new tabs, always create new
         if (alwaysCreateNewTabCheckbox.isSelected()) {
             objectByNameResults = new ObjectByNameResult();
             return generateRetrievedObjectsResultId();
         }
 
-        // Check if there are existing retrieved objects tabs (use counter instead of current data)
-        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
-
-        // If no existing tabs, automatically create new tab (avoid UI friction)
-        if (!hasExistingTabs) {
+        // If checkbox is unchecked, prefer appending to existing tabs
+        if (hasExistingTabs) {
+            // Append to existing tab automatically
+            String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
+            // Load existing results from the tab to preserve contents
+            ObjectByNameResult existingResults = tabObjectResults.get(lastTabId);
+            if (existingResults != null) {
+                objectByNameResults = existingResults; // Use existing results for appending
+            }
+            return lastTabId;
+        } else {
+            // No existing tabs, create new tab
             objectByNameResults = new ObjectByNameResult();
             return generateRetrievedObjectsResultId();
-        }
-
-        // Show dialog asking user preference only when tabs exist
-        // Since we only reach here when hasExistingTabs is true, simplify logic
-        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
-        Object[] options = {
-            "Append to current tab (" + lastTabId + ")",
-            "Create new tab",
-            "Cancel"
-        };
-        String countText = objectCount > 0 ? objectCount + " " : "";
-        String message = "You are about to retrieve " + countText + objectType + ".\n" +
-                        "You already have retrieved objects. How would you like to proceed?";
-        
-        int choice = JOptionPane.showOptionDialog(
-            mainPanel,
-            message,
-            "Bulk Retrieval - Tab Selection",
-            JOptionPane.YES_NO_CANCEL_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]
-        );
-        
-        if (hasExistingTabs) {
-            switch (choice) {
-                case 0: // Append to existing tab
-                    // Load existing results from the tab to preserve contents
-                    ObjectByNameResult existingResults = tabObjectResults.get(lastTabId);
-                    if (existingResults != null) {
-                        objectByNameResults = existingResults; // Use existing results for appending
-                    }
-                    return lastTabId;
-                case 1: // Create new tab
-                    objectByNameResults = new ObjectByNameResult();
-                    return generateRetrievedObjectsResultId();
-                default: // Cancel or close
-                    return null;
-            }
-        } else {
-            switch (choice) {
-                case 0: // Create new tab (only option)
-                    objectByNameResults = new ObjectByNameResult();
-                    return generateRetrievedObjectsResultId();
-                default: // Cancel or close
-                    return null;
-            }
         }
     }
 
@@ -805,48 +749,23 @@ public class ActionsTab {
      * Get user's choice for tab handling when retrieving records
      */
     private String getUserTabChoiceForRecordRetrieval(String recordId) {
-        // If user prefers to always create new tabs, bypass dialog
+        // Check if there are existing retrieved records tabs
+        boolean hasExistingTabs = retrievedRecordsResultCounter > 0;
+
+        // If user prefers to always create new tabs, always create new
         if (alwaysCreateNewTabCheckbox.isSelected()) {
             return generateRetrievedRecordsResultId();
         }
 
-        // Check if there are existing retrieved records tabs
-        boolean hasExistingTabs = retrievedRecordsResultCounter > 0;
-
-        // If no existing tabs, automatically create new tab (avoid UI friction)
-        if (!hasExistingTabs) {
+        // If checkbox is unchecked, prefer appending to existing tabs
+        if (hasExistingTabs) {
+            // Append to existing tab automatically
+            String lastTabId = "Retrieved Records " + retrievedRecordsResultCounter;
+            return lastTabId;
+        } else {
+            // No existing tabs, create new tab
             return generateRetrievedRecordsResultId();
         }
-
-        // Show dialog asking user preference only when tabs exist
-        String lastTabId = "Retrieved Records " + retrievedRecordsResultCounter;
-        Object[] options = {
-            "Append to current tab (" + lastTabId + ")",
-            "Create new tab",
-            "Cancel"
-        };
-        String message = "You are about to retrieve record: " + recordId + "\n" +
-                        "You already have retrieved records. How would you like to proceed?";
-
-        int choice = JOptionPane.showOptionDialog(
-            mainPanel,
-            message,
-            "Record Retrieval - Tab Selection",
-            JOptionPane.YES_NO_CANCEL_OPTION,
-            JOptionPane.QUESTION_MESSAGE,
-            null,
-            options,
-            options[0]
-        );
-
-        switch (choice) {
-            case 0: // Append to existing tab
-                return lastTabId;
-            case 1: // Create new tab
-                return generateRetrievedRecordsResultId();
-            default: // Cancel or close
-                return null;
-            }
     }
 
     /**
