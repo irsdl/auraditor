@@ -701,9 +701,16 @@ public class ActionsTab {
         }
 
         // Check if there are existing retrieved objects tabs
+        boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
+
+        // If no existing tabs, automatically create new tab (avoid UI friction)
+        if (!hasExistingTabs) {
+            objectByNameResults = new ObjectByNameResult();
+            return generateRetrievedObjectsResultId();
+        }
+
+        // Show dialog asking user preference only when tabs exist
         String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
-        
-        // Show dialog asking user preference
         Object[] options = {"Append to current tab (" + lastTabId + ")", "Create new tab"};
         int choice = JOptionPane.showOptionDialog(
             mainPanel,
@@ -739,29 +746,23 @@ public class ActionsTab {
         // Check if there are existing retrieved objects tabs (use counter instead of current data)
         boolean hasExistingTabs = retrievedObjectsResultCounter > 0;
 
-        // Always show dialog asking user preference
-        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
-        Object[] options;
-        String message;
-
-        if (hasExistingTabs) {
-            options = new Object[]{
-                "Append to current tab (" + lastTabId + ")",
-                "Create new tab",
-                "Cancel"
-            };
-            String countText = objectCount > 0 ? objectCount + " " : "";
-            message = "You are about to retrieve " + countText + objectType + ".\n" +
-                     "You already have retrieved objects. How would you like to proceed?";
-        } else {
-            options = new Object[]{
-                "Create new tab",
-                "Cancel"
-            };
-            String countText = objectCount > 0 ? objectCount + " " : "";
-            message = "You are about to retrieve " + countText + objectType + ".\n" +
-                     "How would you like to proceed?";
+        // If no existing tabs, automatically create new tab (avoid UI friction)
+        if (!hasExistingTabs) {
+            objectByNameResults = new ObjectByNameResult();
+            return generateRetrievedObjectsResultId();
         }
+
+        // Show dialog asking user preference only when tabs exist
+        // Since we only reach here when hasExistingTabs is true, simplify logic
+        String lastTabId = "Retrieved Objects " + retrievedObjectsResultCounter;
+        Object[] options = {
+            "Append to current tab (" + lastTabId + ")",
+            "Create new tab",
+            "Cancel"
+        };
+        String countText = objectCount > 0 ? objectCount + " " : "";
+        String message = "You are about to retrieve " + countText + objectType + ".\n" +
+                        "You already have retrieved objects. How would you like to proceed?";
         
         int choice = JOptionPane.showOptionDialog(
             mainPanel,
@@ -812,27 +813,20 @@ public class ActionsTab {
         // Check if there are existing retrieved records tabs
         boolean hasExistingTabs = retrievedRecordsResultCounter > 0;
 
-        // Always show dialog asking user preference
-        String lastTabId = "Retrieved Records " + retrievedRecordsResultCounter;
-        Object[] options;
-        String message;
-
-        if (hasExistingTabs) {
-            options = new Object[]{
-                "Append to current tab (" + lastTabId + ")",
-                "Create new tab",
-                "Cancel"
-            };
-            message = "You are about to retrieve record: " + recordId + "\n" +
-                     "You already have retrieved records. How would you like to proceed?";
-        } else {
-            options = new Object[]{
-                "Create new tab",
-                "Cancel"
-            };
-            message = "You are about to retrieve record: " + recordId + "\n" +
-                     "How would you like to proceed?";
+        // If no existing tabs, automatically create new tab (avoid UI friction)
+        if (!hasExistingTabs) {
+            return generateRetrievedRecordsResultId();
         }
+
+        // Show dialog asking user preference only when tabs exist
+        String lastTabId = "Retrieved Records " + retrievedRecordsResultCounter;
+        Object[] options = {
+            "Append to current tab (" + lastTabId + ")",
+            "Create new tab",
+            "Cancel"
+        };
+        String message = "You are about to retrieve record: " + recordId + "\n" +
+                        "You already have retrieved records. How would you like to proceed?";
 
         int choice = JOptionPane.showOptionDialog(
             mainPanel,
@@ -845,23 +839,14 @@ public class ActionsTab {
             options[0]
         );
 
-        if (hasExistingTabs) {
-            switch (choice) {
-                case 0: // Append to existing tab
-                    return lastTabId;
-                case 1: // Create new tab
-                    return generateRetrievedRecordsResultId();
-                default: // Cancel or close
-                    return null;
+        switch (choice) {
+            case 0: // Append to existing tab
+                return lastTabId;
+            case 1: // Create new tab
+                return generateRetrievedRecordsResultId();
+            default: // Cancel or close
+                return null;
             }
-        } else {
-            switch (choice) {
-                case 0: // Create new tab (only option)
-                    return generateRetrievedRecordsResultId();
-                default: // Cancel or close
-                    return null;
-            }
-        }
     }
 
     /**
