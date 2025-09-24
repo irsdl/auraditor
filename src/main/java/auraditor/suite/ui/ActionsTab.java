@@ -220,7 +220,7 @@ public class ActionsTab {
         void createResultTab(String resultId, String content);
         void createDiscoveryResultTab(String resultId, DiscoveryResult discoveryResult);
         void createObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult);
-        void createRecordTab(String recordId, String recordData, BaseRequest baseRequest);
+        void createRecordTab(String resultId, String recordId, String recordData, BaseRequest baseRequest);
 
         // New method for updating tabs without automatic switching
         default void updateObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult) {
@@ -1372,7 +1372,7 @@ public class ActionsTab {
 
             // Create the result tab with request information
             SwingUtilities.invokeLater(() -> {
-                resultTabCallback.createRecordTab(recordId, resultContent, baseRequest);
+                resultTabCallback.createRecordTab(resultId, recordId, resultContent, baseRequest);
                 clearBusyState();
                 showStatusMessage("✓ Record retrieved successfully: " + recordId, Color.GREEN);
             });

@@ -75,8 +75,8 @@ public class AuraditorSuiteTab {
             }
 
             @Override
-            public void createRecordTab(String recordId, String recordData, BaseRequest baseRequest) {
-                AuraditorSuiteTab.this.createRecordTab(recordId, recordData, baseRequest);
+            public void createRecordTab(String resultId, String recordId, String recordData, BaseRequest baseRequest) {
+                AuraditorSuiteTab.this.createRecordTab(resultId, recordId, recordData, baseRequest);
             }
 
             public void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
@@ -267,7 +267,7 @@ public class AuraditorSuiteTab {
     /**
      * Create a new retrieved records result tab with context menu support
      */
-    private void createRecordTab(String recordId, String recordData, BaseRequest baseRequest) {
+    private void createRecordTab(String resultId, String recordId, String recordData, BaseRequest baseRequest) {
         SwingUtilities.invokeLater(() -> {
             // Remove "No Results" tab if it exists
             if (resultsTabbedPane.getTabCount() == 1 &&
@@ -275,13 +275,13 @@ public class AuraditorSuiteTab {
                 resultsTabbedPane.removeTabAt(0);
             }
 
-            // Check if a "Retrieved Records" tab already exists
+            // Check if the specified resultId tab already exists
             ActionsTab.RetrievedRecordsResultPanel existingPanel = null;
             int existingTabIndex = -1;
 
             for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
                 String tabTitle = resultsTabbedPane.getTitleAt(i);
-                if ("Retrieved Records".equals(tabTitle)) {
+                if (resultId.equals(tabTitle)) {
                     Component component = resultsTabbedPane.getComponentAt(i);
                     if (component instanceof ActionsTab.RetrievedRecordsResultPanel) {
                         existingPanel = (ActionsTab.RetrievedRecordsResultPanel) component;
@@ -301,8 +301,8 @@ public class AuraditorSuiteTab {
                 ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel =
                     new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, baseRequest, api);
 
-                // Add the new result tab with a fixed name for accumulation
-                resultsTabbedPane.addTab("Retrieved Records", retrievedRecordsPanel);
+                // Add the new result tab with the specific resultId name
+                resultsTabbedPane.addTab(resultId, retrievedRecordsPanel);
 
                 // Switch to the new tab
                 resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
