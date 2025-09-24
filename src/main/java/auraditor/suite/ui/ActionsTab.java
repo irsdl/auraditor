@@ -896,9 +896,9 @@ public class ActionsTab {
             HttpRequest originalRequest = baseRequest.getRequestResponse().request();
             HttpRequest discoveryRequest = modifyMessageParameter(originalRequest, DISCOVERY_PAYLOAD);
             
-            // Send the request
+            // Send the request with preserved HTTP version
             api.logging().logToOutput("Sending discovery request to: " + originalRequest.url());
-            HttpRequestResponse response = api.http().sendRequest(discoveryRequest);
+            HttpRequestResponse response = sendRequestWithPreservedHttpVersion(discoveryRequest, baseRequest);
             
             if (response.response() == null) {
                 throw new RuntimeException("No response received");
@@ -933,9 +933,9 @@ public class ActionsTab {
             HttpRequest originalRequest = baseRequest.getRequestResponse().request();
             HttpRequest specificObjectRequest = modifyMessageParameter(originalRequest, specificObjectPayload);
             
-            // Send the request
+            // Send the request with preserved HTTP version
             api.logging().logToOutput("Sending specific object request to: " + originalRequest.url());
-            HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
+            HttpRequestResponse response = sendRequestWithPreservedHttpVersion(specificObjectRequest, baseRequest);
             
             if (response.response() == null) {
                 throw new RuntimeException("No response received");
@@ -1056,7 +1056,7 @@ public class ActionsTab {
 
                     // Send the request
                     api.logging().logToOutput("Sending HTTP request for object: " + objectName);
-                    HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
+                    HttpRequestResponse response = sendRequestWithPreservedHttpVersion(specificObjectRequest, baseRequest);
                     api.logging().logToOutput("HTTP request completed for object: " + objectName);
                     
                     // Check for cancellation after request
@@ -1297,7 +1297,7 @@ public class ActionsTab {
 
                     // Send the request
                     api.logging().logToOutput("Sending HTTP request for object: " + objectName);
-                    HttpRequestResponse response = api.http().sendRequest(specificObjectRequest);
+                    HttpRequestResponse response = sendRequestWithPreservedHttpVersion(specificObjectRequest, baseRequest);
                     api.logging().logToOutput("HTTP request completed for object: " + objectName);
 
                     // Check for cancellation after request
@@ -1451,9 +1451,9 @@ public class ActionsTab {
             HttpRequest originalRequest = baseRequest.getRequestResponse().request();
             HttpRequest recordRequest = modifyMessageParameter(originalRequest, recordPayload);
 
-            // Send the request
+            // Send the request with preserved HTTP version
             api.logging().logToOutput("Sending record retrieval request to: " + originalRequest.url());
-            HttpRequestResponse response = api.http().sendRequest(recordRequest);
+            HttpRequestResponse response = sendRequestWithPreservedHttpVersion(recordRequest, baseRequest);
 
             if (response.response() == null) {
                 throw new RuntimeException("No response received");
@@ -1631,7 +1631,42 @@ public class ActionsTab {
             throw new RuntimeException("Failed to modify body parameter: " + e.getMessage(), e);
         }
     }
-    
+
+    /**
+     * Send HTTP request while being aware of HTTP version compatibility.
+     * This logs HTTP version information to help diagnose 400 Bad Request errors
+     * that can occur when there are HTTP version mismatches.
+     */
+    private HttpRequestResponse sendRequestWithPreservedHttpVersion(HttpRequest modifiedRequest, BaseRequest baseRequest) {
+        try {
+            // Get the original request to check HTTP version
+            HttpRequest originalRequest = baseRequest.getRequestResponse().request();
+            String originalHttpVersion = originalRequest.httpVersion();
+            String modifiedHttpVersion = modifiedRequest.httpVersion();
+
+            api.logging().logToOutput("HTTP Version Check - Original: " + originalHttpVersion +
+                                    ", Modified: " + modifiedHttpVersion);
+
+            // Log HTTP version mismatch for debugging
+            if (!originalHttpVersion.equals(modifiedHttpVersion)) {
+                api.logging().logToOutput("WARNING: HTTP version mismatch detected! " +
+                                        "Original: " + originalHttpVersion +
+                                        ", Modified: " + modifiedHttpVersion +
+                                        ". This may cause 400 Bad Request errors.");
+                api.logging().logToOutput("If you encounter 400 errors, this HTTP version mismatch may be the cause.");
+            }
+
+            // Send the request - let Montoya API handle HTTP version automatically
+            // The API should negotiate the appropriate version based on the connection
+            return api.http().sendRequest(modifiedRequest);
+
+        } catch (Exception e) {
+            api.logging().logToError("Error during HTTP version-aware request sending: " + e.getMessage());
+            // Fallback to direct send
+            return api.http().sendRequest(modifiedRequest);
+        }
+    }
+
     /**
      * Parse the discovery response to extract object names from apiNamesToKeyPrefixes
      */
