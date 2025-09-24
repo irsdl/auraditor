@@ -46,7 +46,7 @@ public class BaseRequestsTab {
     private JCheckBox useColorAnnotationCheckBox;
     private JComboBox<HighlightColor> colorSelector;
 
-    // Remove Authentication button
+    // Add as Unauthenticated button (renamed from Remove Authentication)
     private JButton removeAuthButton;
     
     public BaseRequestsTab(MontoyaApi api, List<BaseRequest> baseRequests) {
@@ -131,12 +131,18 @@ public class BaseRequestsTab {
 
         topPanel.add(colorSelector);
 
-        // Remove Authentication button
-        removeAuthButton = new JButton("Remove Authentication");
+        // Add as Unauthenticated button (renamed from Remove Authentication)
+        removeAuthButton = new JButton("Add as Unauthenticated");
         removeAuthButton.setToolTipText("Create a copy of the selected request with authentication removed (cookies, authorization headers, and aura.token)");
         removeAuthButton.setEnabled(false); // Initially disabled
         removeAuthButton.addActionListener(e -> removeAuthentication());
         topPanel.add(removeAuthButton);
+
+        // Clear All Requests button
+        JButton clearAllRequestsBtn = new JButton("Clear All Requests");
+        clearAllRequestsBtn.setToolTipText("Remove all base requests from the list");
+        clearAllRequestsBtn.addActionListener(e -> clearAllRequests());
+        topPanel.add(clearAllRequestsBtn);
 
         return topPanel;
     }
@@ -378,7 +384,7 @@ public class BaseRequestsTab {
                 if (selectedRow >= 0 && selectedRow < baseRequests.size()) {
                     showRequestDetails(baseRequests.get(selectedRow));
                 }
-                // Update Remove Authentication button state - enable only when exactly 1 request is selected
+                // Update Add as Unauthenticated button state - enable only when exactly 1 request is selected
                 removeAuthButton.setEnabled(requestTable.getSelectedRowCount() == 1);
             }
         });
@@ -410,7 +416,7 @@ public class BaseRequestsTab {
     }
     
     /**
-     * Show context menu for deleting requests
+     * Show context menu with options for selected requests
      */
     private void showContextMenu(MouseEvent e) {
         int rowAtPoint = requestTable.rowAtPoint(e.getPoint());
@@ -423,9 +429,20 @@ public class BaseRequestsTab {
         // Only show menu if there are selected rows
         if (requestTable.getSelectedRowCount() > 0) {
             JPopupMenu contextMenu = new JPopupMenu();
+
+            // Add as Unauthenticated menu item - only show when exactly 1 request is selected
+            if (requestTable.getSelectedRowCount() == 1) {
+                JMenuItem addUnauthenticatedItem = new JMenuItem("Add as Unauthenticated");
+                addUnauthenticatedItem.addActionListener(ev -> removeAuthentication());
+                contextMenu.add(addUnauthenticatedItem);
+                contextMenu.addSeparator();
+            }
+
+            // Delete menu item
             JMenuItem deleteItem = new JMenuItem("Delete Selected Request(s)");
             deleteItem.addActionListener(ev -> deleteSelectedRequests());
             contextMenu.add(deleteItem);
+
             contextMenu.show(requestTable, e.getX(), e.getY());
         }
     }
@@ -582,6 +599,47 @@ public class BaseRequestsTab {
             api.logging().logToError("Error removing authentication: " + e.getMessage());
             showNonBlockingMessage("Error removing authentication: " + e.getMessage(), "error");
         }
+    }
+
+    /**
+     * Clear all base requests from the list
+     */
+    private void clearAllRequests() {
+        if (baseRequests.isEmpty()) {
+            showNonBlockingMessage("No requests to clear", "warning");
+            return;
+        }
+
+        // Confirm if there are multiple requests
+        if (baseRequests.size() > 1) {
+            int result = JOptionPane.showConfirmDialog(
+                mainPanel,
+                "Are you sure you want to clear all " + baseRequests.size() + " base requests?",
+                "Confirm Clear All",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+            if (result != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+
+        // Clear all requests
+        int clearedCount = baseRequests.size();
+        baseRequests.clear();
+
+        // Refresh table and clear request viewer
+        refreshTable();
+        HttpRequest emptyRequest = HttpRequest.httpRequest("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
+        requestEditor.setRequest(emptyRequest);
+
+        // Notify callback that requests have changed
+        if (onRequestsChangedCallback != null) {
+            onRequestsChangedCallback.run();
+        }
+
+        showNonBlockingMessage("Cleared " + clearedCount + " base request" + (clearedCount == 1 ? "" : "s"), "success");
+        api.logging().logToOutput("Cleared " + clearedCount + " base request(s)");
     }
 
     /**
