@@ -196,10 +196,8 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
                 String tabTitle = nextId + "::" + nextActionRequest.calledMethod;
                 this.pane.add(tabTitle, arPanel);
                 
-                // Add close button to all tabs except the first one
-                if (tabIndex > 0) {
-                    addCloseButtonToTab(tabIndex, nextId);
-                }
+                // Add close button to all tabs
+                addCloseButtonToTab(tabIndex, nextId);
                 tabIndex++;
             }
 
@@ -303,18 +301,47 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
             if (tabIndex >= 0) {
                 this.pane.removeTabAt(tabIndex);
             }
-            
+
             // Remove from our tracking maps
             actionRequestTabs.remove(actionId);
-            
+
             // Remove from the AuraMessage
             if (currentAuraMessage != null) {
                 currentAuraMessage.actionMap.remove(actionId);
                 currentAuraMessage.setEdited(true);
+
+                // Check if this was the last action - if so, create empty JSON
+                if (currentAuraMessage.actionMap.isEmpty()) {
+                    createEmptyMessage();
+                }
             }
-            
+
             // Mark as edited
             isEdited = true;
+        }
+    }
+
+    /**
+     * Create an empty actions array when all actions are removed
+     */
+    private void createEmptyMessage() {
+        try {
+            // Create JSON object with empty actions array: {"actions":[]}
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.node.ObjectNode emptyNode = mapper.createObjectNode();
+            com.fasterxml.jackson.databind.node.ArrayNode emptyActions = mapper.createArrayNode();
+            emptyNode.set("actions", emptyActions);
+
+            // Replace the current aura message with empty actions structure
+            if (currentAuraMessage != null) {
+                currentAuraMessage.auraMessage = emptyNode;
+                currentAuraMessage.setEdited(true);
+            }
+
+            api.logging().logToOutput("All Aura actions removed - message parameter set to {\"actions\":[]}");
+
+        } catch (Exception e) {
+            api.logging().logToError("Error creating empty message: " + e.getMessage());
         }
     }
 
@@ -427,16 +454,96 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
 
         startIndex += searchPattern.length();
 
-        // Find the next & or end of string to determine parameter value end
-        int endIndex = body.indexOf('&', startIndex);
-        if (endIndex == -1) {
-            endIndex = body.length();
-        }
+        // For multiline JSON parameters, we need to be more careful about finding the end
+        // The standard approach of looking for '&' doesn't work well with complex JSON
+        int endIndex = findParameterEnd(body, startIndex);
 
         String paramValue = body.substring(startIndex, endIndex);
 
         // URL decode the extracted value
         return Utils.urlDecode(paramValue);
+    }
+
+    /**
+     * Find the end of a parameter value, handling multiline JSON content
+     */
+    private int findParameterEnd(String body, int startIndex) {
+        // Look for common URL-encoded parameter separators
+        int ampersandIndex = body.indexOf('&', startIndex);
+
+        // If there's no & found, this is likely the last parameter
+        if (ampersandIndex == -1) {
+            return body.length();
+        }
+
+        // Check if we have a complex JSON structure by looking for common patterns
+        String valuePrefix = body.substring(startIndex, Math.min(startIndex + 100, body.length()));
+
+        // If it starts with encoded { (%7B) or raw {, it's likely JSON
+        if (valuePrefix.startsWith("%7B") || valuePrefix.startsWith("{")) {
+            // For JSON, we need to find the matching closing brace
+            return findJsonParameterEnd(body, startIndex);
+        }
+
+        // For non-JSON parameters, use the standard & separator
+        return ampersandIndex;
+    }
+
+    /**
+     * Find the end of a JSON parameter by matching braces (accounting for URL encoding)
+     */
+    private int findJsonParameterEnd(String body, int startIndex) {
+        int braceDepth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = startIndex; i < body.length(); i++) {
+            String current = body.substring(i, Math.min(i + 3, body.length()));
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            // Handle URL-encoded characters
+            if (current.startsWith("%22")) { // URL-encoded quote "
+                inString = !inString;
+                i += 2; // Skip the encoded bytes
+            } else if (current.startsWith("%5C")) { // URL-encoded backslash \
+                escaped = true;
+                i += 2;
+            } else if (current.startsWith("%7B")) { // URL-encoded {
+                if (!inString) braceDepth++;
+                i += 2;
+            } else if (current.startsWith("%7D")) { // URL-encoded }
+                if (!inString) {
+                    braceDepth--;
+                    if (braceDepth == 0) {
+                        return i + 3; // Return position after the closing brace
+                    }
+                }
+                i += 2;
+            } else if (current.charAt(0) == '"' && !inString) {
+                inString = true;
+            } else if (current.charAt(0) == '"' && inString) {
+                inString = false;
+            } else if (current.charAt(0) == '\\' && inString) {
+                escaped = true;
+            } else if (current.charAt(0) == '{' && !inString) {
+                braceDepth++;
+            } else if (current.charAt(0) == '}' && !inString) {
+                braceDepth--;
+                if (braceDepth == 0) {
+                    return i + 1; // Return position after the closing brace
+                }
+            } else if (current.charAt(0) == '&' && braceDepth == 0 && !inString) {
+                // Found the end of parameter
+                return i;
+            }
+        }
+
+        // If we reach here, no proper end was found, return end of string
+        return body.length();
     }
 
     /**

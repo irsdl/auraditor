@@ -212,7 +212,45 @@ public class ActionsTab {
             objectEntries.put(objectName, jsonData);
         }
     }
-    
+
+    /**
+     * Data structure for route discovery results
+     */
+    public static class RouteDiscoveryResult {
+        private final java.util.Map<String, java.util.List<String>> routeEntries;
+        private final String timestamp;
+
+        public RouteDiscoveryResult() {
+            this.routeEntries = new java.util.LinkedHashMap<>();
+            this.timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        }
+
+        public java.util.Map<String, java.util.List<String>> getRouteEntries() {
+            return routeEntries;
+        }
+
+        public java.util.Set<String> getCategoryNames() {
+            return routeEntries.keySet();
+        }
+
+        public java.util.List<String> getRoutesForCategory(String category) {
+            return routeEntries.get(category);
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
+
+        public int getTotalCount() {
+            return routeEntries.values().stream().mapToInt(List::size).sum();
+        }
+
+        public void addRouteCategory(String categoryName, java.util.List<String> routes) {
+            routeEntries.put(categoryName, new java.util.ArrayList<>(routes));
+        }
+    }
+
     /**
      * Callback interface for result tab creation
      */
@@ -221,6 +259,13 @@ public class ActionsTab {
         void createDiscoveryResultTab(String resultId, DiscoveryResult discoveryResult);
         void createObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult);
         void createRecordTab(String resultId, String recordId, String recordData, BaseRequest baseRequest);
+        void createDiscoveredRoutesTab(String resultId, RouteDiscoveryResult routeDiscoveryResult);
+
+        // New method for updating route discovery tabs without automatic switching
+        default void updateDiscoveredRoutesTab(String resultId, RouteDiscoveryResult routeDiscoveryResult) {
+            // Default implementation falls back to createDiscoveredRoutesTab
+            createDiscoveredRoutesTab(resultId, routeDiscoveryResult);
+        }
 
         // New method for updating tabs without automatic switching
         default void updateObjectByNameTab(String resultId, ObjectByNameResult objectByNameResult) {
@@ -247,6 +292,7 @@ public class ActionsTab {
     private final JCheckBox alwaysCreateNewTabCheckbox;
     private final JButton getRecordByIdBtn;
     private final JTextField recordIdField;
+    private final JButton getNavItemsBtn;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
     private final JPanel statusPanel;
@@ -265,6 +311,7 @@ public class ActionsTab {
     private int objsByWordlistResultCounter = 0;
     private int retrievedObjectsResultCounter = 0;
     private int retrievedRecordsResultCounter = 0;
+    private int routeDiscoveryResultCounter = 0;
     private final List<String> availableDiscoveryResults = new ArrayList<>();
     
     // Progress tracking fields for bulk retrieval
@@ -285,6 +332,7 @@ public class ActionsTab {
     
     // Object discovery payload
     private static final String DISCOVERY_PAYLOAD = "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"serviceComponent://ui.force.components.controllers.hostConfig.HostConfigController/ACTION$getConfigData\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{}}]}";
+    private static final String ROUTE_DISCOVERY_PAYLOAD = "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"aura://AppsController/ACTION$getNavItems\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{\"inContextOfComponent\":\"\",\"mode\":\"VIEW\",\"layoutType\":\"FULL\",\"defaultFieldValues\":null,\"navigationLocation\":\"LIST_VIEW_ROW\"}}]}";
     
     // Specific object search payload template - %s will be replaced with the escaped object name
     private static final String SPECIFIC_OBJECT_PAYLOAD_TEMPLATE = "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{\"entityNameOrId\":\"%s\",\"layoutType\":\"FULL\",\"pageSize\":1000,\"currentPage\":0,\"useTimeout\":false,\"getCount\":false,\"enableRowActions\":false}}]}";
@@ -312,6 +360,7 @@ public class ActionsTab {
         this.alwaysCreateNewTabCheckbox = new JCheckBox("Always create new tab", false);
         this.getRecordByIdBtn = new JButton("Get Record by ID");
         this.recordIdField = new JTextField(15);
+        this.getNavItemsBtn = new JButton("Get Nav Items");
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
         
@@ -444,6 +493,18 @@ public class ActionsTab {
         recordIdField.setToolTipText("Enter the record ID to retrieve");
         actionsPanel.add(recordIdField, gbc);
 
+        // Route Discovery section
+        gbc.gridx = 0; gbc.gridy++; gbc.gridwidth = 2;
+        JLabel routeLabel = new JLabel("Route Discovery");
+        routeLabel.setFont(routeLabel.getFont().deriveFont(Font.BOLD, 14f));
+        actionsPanel.add(routeLabel, gbc);
+
+        gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
+        getNavItemsBtn.setText("Get Nav Items");
+        getNavItemsBtn.setToolTipText("Discover navigation items and routes (sends 1 request)");
+        getNavItemsBtn.setEnabled(false); // Initially disabled until baseline request is selected
+        actionsPanel.add(getNavItemsBtn, gbc);
+
         // Thread count configuration
         gbc.gridy++; gbc.gridwidth = 2; gbc.weighty = 0.0;
         JPanel threadPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
@@ -563,6 +624,7 @@ public class ActionsTab {
         findObjectByNameBtn.setEnabled(false);
         findDefaultObjectsPresetBtn.setEnabled(false);
         getRecordByIdBtn.setEnabled(false);
+        getNavItemsBtn.setEnabled(false);
 
         // Disable all input controls
         requestSelector.setEnabled(false);
@@ -656,6 +718,14 @@ public class ActionsTab {
     private String generateDiscoverResultId(int requestId) {
         discoverResultCounter++;
         return "Discovered Objects " + discoverResultCounter + " - Req " + requestId;
+    }
+
+    /**
+     * Generate result ID for route discovery operations
+     */
+    private String generateRouteDiscoveryResultId() {
+        routeDiscoveryResultCounter++;
+        return "Discovered Routes " + routeDiscoveryResultCounter;
     }
     
     /**
@@ -819,7 +889,38 @@ public class ActionsTab {
             throw e;
         }
     }
-    
+
+    /**
+     * Perform route discovery by sending the route discovery payload and parsing the response
+     */
+    private void performRouteDiscovery(BaseRequest baseRequest, String resultId) {
+        api.logging().logToOutput("Starting route discovery with baseline request...");
+
+        try {
+            // Create a modified request with the route discovery payload in the message parameter
+            HttpRequest originalRequest = baseRequest.getRequestResponse().request();
+            HttpRequest routeDiscoveryRequest = modifyMessageParameter(originalRequest, ROUTE_DISCOVERY_PAYLOAD);
+
+            // Send the request with preserved HTTP version
+            api.logging().logToOutput("Sending route discovery request to: " + originalRequest.url());
+            HttpRequestResponse response = sendRequestWithPreservedHttpVersion(routeDiscoveryRequest, baseRequest);
+
+            if (response.response() == null) {
+                throw new RuntimeException("No response received");
+            }
+
+            // Parse the response to extract navigation items
+            String responseBody = response.response().bodyToString();
+            api.logging().logToOutput("Route discovery response received, parsing navigation items...");
+
+            parseRouteDiscoveryResponse(responseBody, resultId, baseRequest.getId());
+
+        } catch (Exception e) {
+            api.logging().logToError("Route discovery failed: " + e.getMessage());
+            throw e;
+        }
+    }
+
     /**
      * Perform specific object search by modifying the request and parsing the response
      */
@@ -1642,7 +1743,82 @@ public class ActionsTab {
             throw new RuntimeException("Failed to parse discovery response", e);
         }
     }
-    
+
+    /**
+     * Parse the route discovery response to extract navigation items and content URLs
+     */
+    private void parseRouteDiscoveryResponse(String responseBody, String resultId, int requestId) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode rootNode = mapper.readTree(responseBody);
+
+            // Navigate to actions[0].returnValue.navItems
+            JsonNode actionsNode = rootNode.path("actions");
+            if (!actionsNode.isArray() || actionsNode.size() == 0) {
+                throw new RuntimeException("Invalid response format: no actions array");
+            }
+
+            JsonNode firstAction = actionsNode.get(0);
+            String state = firstAction.path("state").asText();
+
+            if (!"SUCCESS".equals(state)) {
+                throw new RuntimeException("Route discovery request failed with state: " + state);
+            }
+
+            JsonNode returnValue = firstAction.path("returnValue");
+            JsonNode navItemsNode = returnValue.path("navItems");
+
+            if (navItemsNode.isMissingNode() || !navItemsNode.isArray()) {
+                throw new RuntimeException("No navItems array found in response");
+            }
+
+            // Extract content URLs from navItems
+            java.util.List<String> contentUrls = new java.util.ArrayList<>();
+
+            for (JsonNode navItem : navItemsNode) {
+                JsonNode contentNode = navItem.path("content");
+                if (!contentNode.isMissingNode() && !contentNode.asText().trim().isEmpty()) {
+                    String contentUrl = contentNode.asText().trim();
+                    if (!contentUrl.equals("null")) { // Also check for string "null"
+                        contentUrls.add(contentUrl);
+                    }
+                }
+            }
+
+            // Create RouteDiscoveryResult
+            RouteDiscoveryResult routeDiscoveryResult = new RouteDiscoveryResult();
+
+            // Add category with timestamp and request info
+            String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String categoryName = "Retrieved Nav Items (request" + requestId + "-" +
+                timestamp.replace(" ", "-").replace(":", "-") + ")";
+
+            routeDiscoveryResult.addRouteCategory(categoryName, contentUrls);
+
+            api.logging().logToOutput("Route discovery parsed: " + contentUrls.size() + " navigation items found");
+
+            // Update UI on EDT
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                // Create or update result tab
+                resultTabCallback.updateDiscoveredRoutesTab(resultId, routeDiscoveryResult);
+                showStatusMessage("✓ Route discovery completed: " + contentUrls.size() + " navigation items found", Color.GREEN);
+
+                api.logging().logToOutput("Route discovery completed successfully:");
+                api.logging().logToOutput("  Navigation items found: " + contentUrls.size());
+                api.logging().logToOutput("  Category: " + categoryName);
+            });
+
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showErrorMessage("Failed to parse route discovery response: " + e.getMessage());
+            });
+            throw new RuntimeException("Failed to parse route discovery response", e);
+        }
+    }
+
     /**
      * Parse the specific object response to extract object data from result array
      */
@@ -1917,6 +2093,7 @@ public class ActionsTab {
         findObjectByNameBtn.addActionListener(e -> executeAction("FindObjectByName"));
         findDefaultObjectsPresetBtn.addActionListener(e -> executeAction("FindDefaultObjectsPreset"));
         getRecordByIdBtn.addActionListener(e -> executeAction("GetRecordById"));
+        getNavItemsBtn.addActionListener(e -> executeAction("GetNavItems"));
 
         // Record ID field handler - enable/disable button based on text content
         recordIdField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -2225,6 +2402,27 @@ public class ActionsTab {
                 }, "RecordRetrieval-" + recordId);
                 currentOperationThread.start();
                 break;
+            case "GetNavItems":
+                setBusyState(getNavItemsBtn, "Route Discovery");
+
+                // Generate result ID for route discovery
+                String routeResultId = generateRouteDiscoveryResultId();
+
+                api.logging().logToOutput("Starting route discovery...");
+
+                // Perform route discovery in background thread
+                ThreadManager.createManagedThread(() -> {
+                    try {
+                        performRouteDiscovery(selectedRequest, routeResultId);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during route discovery: " + e.getMessage());
+                            api.logging().logToError("Route discovery failed: " + e.getMessage());
+                        });
+                    }
+                }, "RouteDiscovery-" + routeResultId).start();
+                break;
         }
     }
     
@@ -2266,6 +2464,9 @@ public class ActionsTab {
         
         // Wordlist button only depends on having requests
         findDefaultObjectsPresetBtn.setEnabled(hasRequests);
+
+        // Route discovery button only depends on having requests
+        getNavItemsBtn.setEnabled(hasRequests);
 
         // Get Record by ID depends on both having requests and non-empty record ID
         updateRecordByIdButtonState();
@@ -3018,7 +3219,301 @@ public class ActionsTab {
             }
         }
     }
-    
+
+    /**
+     * Panel for displaying discovered routes with categories and route list
+     * Similar structure to DiscoveryResultPanel but for navigation items and routes
+     */
+    public static class DiscoveredRoutesResultPanel extends BaseResultPanel {
+        private RouteDiscoveryResult routeDiscoveryResult;
+        private final JList<String> categoryList;
+        private final JTextArea routeListArea;
+        private final JSplitPane splitPane;
+
+        // Filter state
+        private DefaultListModel<String> originalCategoryModel;
+        private DefaultListModel<String> filteredCategoryModel;
+        private boolean isFiltered = false;
+
+        public DiscoveredRoutesResultPanel(RouteDiscoveryResult routeDiscoveryResult) {
+            this.routeDiscoveryResult = routeDiscoveryResult != null ? routeDiscoveryResult : new RouteDiscoveryResult();
+            this.setLayout(new BorderLayout());
+
+            // Initialize list models
+            this.originalCategoryModel = new DefaultListModel<>();
+            this.filteredCategoryModel = new DefaultListModel<>();
+
+            // Populate with route categories (initially may be empty)
+            updateCategoryModels();
+
+            // Create category list
+            this.categoryList = new JList<>(filteredCategoryModel);
+            this.categoryList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            this.categoryList.setVisibleRowCount(4);
+
+            // Create route display area
+            this.routeListArea = new JTextArea();
+            this.routeListArea.setEditable(false);
+            this.routeListArea.setLineWrap(false); // Don't wrap URLs
+            this.routeListArea.setWrapStyleWord(false);
+
+            // Create shared toolbar
+            JPanel toolbarPanel = createSharedToolbar();
+            this.add(toolbarPanel, BorderLayout.NORTH);
+
+            // Create split pane
+            JScrollPane categoryScrollPane = new JScrollPane(categoryList);
+            categoryScrollPane.setPreferredSize(new Dimension(300, 0));
+            JScrollPane routeScrollPane = new JScrollPane(routeListArea);
+
+            this.splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, categoryScrollPane, routeScrollPane);
+            this.splitPane.setDividerLocation(300);
+            this.splitPane.setResizeWeight(0.3);
+
+            this.add(splitPane, BorderLayout.CENTER);
+
+            // Setup category selection listener
+            categoryList.addListSelectionListener(e -> {
+                if (!e.getValueIsAdjusting()) {
+                    updateRouteDisplay();
+                }
+            });
+
+            // Initially display empty state
+            updateRouteDisplay();
+
+            // Add right-click context menu
+            setupContextMenu();
+        }
+
+        /**
+         * Update the panel with new route discovery results (for adding new discoveries)
+         */
+        public void updateRouteDiscoveryResult(RouteDiscoveryResult newResult) {
+            if (newResult == null) return;
+
+            // Merge new results with existing ones
+            for (String categoryName : newResult.getCategoryNames()) {
+                java.util.List<String> routes = newResult.getRoutesForCategory(categoryName);
+                this.routeDiscoveryResult.addRouteCategory(categoryName, routes);
+            }
+
+            // Update UI models
+            updateCategoryModels();
+
+            // Select the newly added category
+            String[] categoryNames = newResult.getCategoryNames().toArray(new String[0]);
+            if (categoryNames.length > 0) {
+                String newCategory = categoryNames[0]; // Select first new category
+                for (int i = 0; i < filteredCategoryModel.getSize(); i++) {
+                    if (filteredCategoryModel.get(i).equals(newCategory)) {
+                        categoryList.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void updateCategoryModels() {
+            originalCategoryModel.clear();
+            filteredCategoryModel.clear();
+
+            for (String categoryName : routeDiscoveryResult.getCategoryNames()) {
+                originalCategoryModel.addElement(categoryName);
+                filteredCategoryModel.addElement(categoryName);
+            }
+        }
+
+        private void updateRouteDisplay() {
+            String selectedCategory = categoryList.getSelectedValue();
+            if (selectedCategory == null) {
+                if (routeDiscoveryResult.getCategoryNames().isEmpty()) {
+                    routeListArea.setText("No route discovery results yet.\nClick 'Get Nav Items' to discover navigation routes.");
+                } else {
+                    routeListArea.setText("");
+                }
+                return;
+            }
+
+            java.util.List<String> routes = routeDiscoveryResult.getRoutesForCategory(selectedCategory);
+            if (routes == null || routes.isEmpty()) {
+                routeListArea.setText("No routes found in this category.");
+                return;
+            }
+
+            // Display content URLs only, one per line
+            StringBuilder content = new StringBuilder();
+            for (String route : routes) {
+                content.append(route).append("\n");
+            }
+
+            routeListArea.setText(content.toString());
+            routeListArea.setCaretPosition(0);
+        }
+
+        private void setupContextMenu() {
+            JPopupMenu contextMenu = new JPopupMenu();
+
+            JMenuItem exportItem = new JMenuItem("Export Routes");
+            exportItem.addActionListener(e -> exportRoutes());
+            contextMenu.add(exportItem);
+
+            routeListArea.setComponentPopupMenu(contextMenu);
+            categoryList.setComponentPopupMenu(contextMenu);
+        }
+
+
+        private void exportRoutes() {
+            new Thread(() -> {
+                try {
+                    String filename = "discovered-routes-" +
+                        java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss"));
+                    StringBuilder exportContent = new StringBuilder();
+
+                    exportContent.append("Discovered Routes Export\n");
+                    exportContent.append("Exported at: ").append(java.time.LocalDateTime.now()).append("\n\n");
+
+                    int totalRoutes = routeDiscoveryResult.getTotalCount();
+                    exportContent.append("Total routes: ").append(totalRoutes).append("\n\n");
+
+                    for (String categoryName : routeDiscoveryResult.getCategoryNames()) {
+                        exportContent.append("Category: ").append(categoryName).append("\n");
+                        exportContent.append("=".repeat(categoryName.length() + 10)).append("\n");
+
+                        java.util.List<String> routes = routeDiscoveryResult.getRoutesForCategory(categoryName);
+                        for (String route : routes) {
+                            exportContent.append(route).append("\n");
+                        }
+                        exportContent.append("\n");
+                    }
+
+                    // Write to file
+                    java.nio.file.Path exportPath = java.nio.file.Paths.get(filename + ".txt");
+                    java.nio.file.Files.write(exportPath, exportContent.toString().getBytes());
+
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(
+                            DiscoveredRoutesResultPanel.this,
+                            "Routes exported to: " + exportPath.toAbsolutePath(),
+                            "Export Complete",
+                            JOptionPane.INFORMATION_MESSAGE
+                        );
+                    });
+
+                } catch (Exception ex) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(
+                            DiscoveredRoutesResultPanel.this,
+                            "Failed to export routes: " + ex.getMessage(),
+                            "Export Error",
+                            JOptionPane.ERROR_MESSAGE
+                        );
+                    });
+                }
+            }).start();
+        }
+
+        @Override
+        protected void performSearch() {
+            String searchText = searchField.getText().trim();
+            if (searchText.isEmpty()) {
+                clearSearch();
+                return;
+            }
+
+            String content = routeListArea.getText();
+            if (content.isEmpty()) {
+                return;
+            }
+
+            // Use the safe regex utility from ActionsTab
+            try {
+                java.util.regex.Pattern pattern = SafeRegex.safeCompile(
+                    java.util.regex.Pattern.quote(searchText),
+                    java.util.regex.Pattern.CASE_INSENSITIVE
+                );
+                java.util.List<Integer> matches = SafeRegex.safeFind(pattern, content);
+
+                if (!matches.isEmpty()) {
+                    searchMatches.clear();
+                    searchMatches.addAll(matches);
+                    currentSearchIndex = 0;
+                    highlightCurrentMatch();
+                    updateSearchStatus("1/" + matches.size());
+                } else {
+                    clearSearch();
+                }
+            } catch (Exception e) {
+                clearSearch();
+            }
+        }
+
+        @Override
+        protected void applyFilter() {
+            String filterText = filterField.getText().trim();
+
+            if (filterText.isEmpty()) {
+                // Clear filter
+                categoryList.setModel(originalCategoryModel);
+                isFiltered = false;
+                return;
+            }
+
+            // Apply filter
+            DefaultListModel<String> filtered = new DefaultListModel<>();
+            for (int i = 0; i < originalCategoryModel.getSize(); i++) {
+                String category = originalCategoryModel.getElementAt(i);
+                if (category.toLowerCase().contains(filterText.toLowerCase())) {
+                    filtered.addElement(category);
+                }
+            }
+
+            categoryList.setModel(filtered);
+            isFiltered = true;
+
+            // Auto-select first item if available
+            if (filtered.getSize() > 0) {
+                categoryList.setSelectedIndex(0);
+            } else {
+                routeListArea.setText("No categories match the filter: " + filterText);
+            }
+        }
+
+        @Override
+        protected int getCursorPosition() {
+            return routeListArea.getCaretPosition();
+        }
+
+        @Override
+        protected void setCursorPosition(int position) {
+            try {
+                routeListArea.setCaretPosition(Math.min(position, routeListArea.getText().length()));
+            } catch (IllegalArgumentException e) {
+                routeListArea.setCaretPosition(0);
+            }
+        }
+
+        @Override
+        protected void performExport() {
+            exportRoutes();
+        }
+
+        @Override
+        protected void highlightCurrentMatch() {
+            if (searchMatches.isEmpty() || currentSearchIndex < 0) return;
+
+            int position = searchMatches.get(currentSearchIndex);
+            routeListArea.setCaretPosition(position);
+            routeListArea.requestFocus();
+        }
+
+        @Override
+        protected void clearSearchHighlighting() {
+            routeListArea.setSelectionStart(0);
+            routeListArea.setSelectionEnd(0);
+        }
+    }
+
     /**
      * Helper class to display requests in the combo box
      */
@@ -4467,6 +4962,18 @@ public class ActionsTab {
         findAllObjectsBtn.setEnabled(false);
 
         api.logging().logToOutput("Discovery state has been reset");
+    }
+
+    /**
+     * Reset the route discovery state
+     */
+    public void resetRouteDiscoveryState() {
+        routeDiscoveryResultCounter = 0;
+
+        // Reset UI state
+        getNavItemsBtn.setEnabled(false);
+
+        api.logging().logToOutput("Route discovery state has been reset");
     }
 
     /**

@@ -79,6 +79,16 @@ public class AuraditorSuiteTab {
                 AuraditorSuiteTab.this.createRecordTab(resultId, recordId, recordData, baseRequest);
             }
 
+            @Override
+            public void createDiscoveredRoutesTab(String resultId, ActionsTab.RouteDiscoveryResult routeDiscoveryResult) {
+                AuraditorSuiteTab.this.createDiscoveredRoutesTab(resultId, routeDiscoveryResult);
+            }
+
+            @Override
+            public void updateDiscoveredRoutesTab(String resultId, ActionsTab.RouteDiscoveryResult routeDiscoveryResult) {
+                AuraditorSuiteTab.this.updateDiscoveredRoutesTab(resultId, routeDiscoveryResult);
+            }
+
             public void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
                 AuraditorSuiteTab.this.createRetrievedRecordsTab(resultId, recordId, recordData);
             }
@@ -167,7 +177,77 @@ public class AuraditorSuiteTab {
             tabbedPane.setSelectedIndex(2); // Results tab index
         });
     }
-    
+
+    /**
+     * Create a new discovered routes result tab with route discovery result
+     */
+    private void createDiscoveredRoutesTab(String resultId, ActionsTab.RouteDiscoveryResult routeDiscoveryResult) {
+        SwingUtilities.invokeLater(() -> {
+            // Remove "No Results" tab if it exists
+            if (resultsTabbedPane.getTabCount() == 1 &&
+                "No Results".equals(resultsTabbedPane.getTitleAt(0))) {
+                resultsTabbedPane.removeTabAt(0);
+            }
+
+            // Create discovered routes result panel
+            ActionsTab.DiscoveredRoutesResultPanel routesPanel = new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult);
+
+            // Add the new result tab
+            resultsTabbedPane.addTab(resultId, routesPanel);
+
+            // Switch to the new tab
+            resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
+
+            // Switch to Results tab in main tabbed pane
+            tabbedPane.setSelectedIndex(2); // Results tab index
+        });
+    }
+
+    /**
+     * Update or create discovered routes result tab with route discovery result
+     */
+    private void updateDiscoveredRoutesTab(String resultId, ActionsTab.RouteDiscoveryResult routeDiscoveryResult) {
+        SwingUtilities.invokeLater(() -> {
+            // Remove "No Results" tab if it exists
+            if (resultsTabbedPane.getTabCount() == 1 &&
+                "No Results".equals(resultsTabbedPane.getTitleAt(0))) {
+                resultsTabbedPane.removeTabAt(0);
+            }
+
+            // Check if Discovered Routes tab already exists
+            int existingTabIndex = -1;
+            for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
+                if (resultId.equals(resultsTabbedPane.getTitleAt(i))) {
+                    existingTabIndex = i;
+                    break;
+                }
+            }
+
+            if (existingTabIndex >= 0) {
+                // Tab exists - update existing panel
+                ActionsTab.DiscoveredRoutesResultPanel existingPanel =
+                    (ActionsTab.DiscoveredRoutesResultPanel) resultsTabbedPane.getComponentAt(existingTabIndex);
+                existingPanel.updateRouteDiscoveryResult(routeDiscoveryResult);
+
+                // Switch to the updated tab
+                resultsTabbedPane.setSelectedIndex(existingTabIndex);
+            } else {
+                // Tab doesn't exist - create new tab
+                ActionsTab.DiscoveredRoutesResultPanel routesPanel =
+                    new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult);
+
+                // Add the new result tab
+                resultsTabbedPane.addTab(resultId, routesPanel);
+
+                // Switch to the new tab
+                resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
+            }
+
+            // Switch to Results tab in main tabbed pane
+            tabbedPane.setSelectedIndex(2); // Results tab index
+        });
+    }
+
     /**
      * Create or update the Object by Name result tab with structured data
      */
@@ -536,6 +616,10 @@ public class AuraditorSuiteTab {
                 // Reset discovery state in ActionsTab
                 actionsTab.resetDiscoveryState();
                 api.logging().logToOutput("Deleted discovery results tab: " + tabTitle);
+            } else if (tabTitle.startsWith("Discovered Routes")) {
+                // Reset route discovery state in ActionsTab
+                actionsTab.resetRouteDiscoveryState();
+                api.logging().logToOutput("Deleted route discovery results tab: " + tabTitle);
             } else if (tabTitle.startsWith("Objects") || tabTitle.startsWith("Retrieved Objects")) {
                 // Clean up object results tracking
                 existingObjectPanels.remove(tabTitle);
