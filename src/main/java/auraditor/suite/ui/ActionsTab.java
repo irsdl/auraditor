@@ -293,6 +293,9 @@ public class ActionsTab {
     private final JButton getRecordByIdBtn;
     private final JTextField recordIdField;
     private final JButton getNavItemsBtn;
+    private final JButton getRouterInitializerPathsBtn;
+    private final JButton getPotentialPathsFromJSBtn;
+    private final JCheckBox searchSitemapOnlyCheckbox;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
     private final JPanel statusPanel;
@@ -361,6 +364,9 @@ public class ActionsTab {
         this.getRecordByIdBtn = new JButton("Get Record by ID");
         this.recordIdField = new JTextField(15);
         this.getNavItemsBtn = new JButton("Get Nav Items");
+        this.getRouterInitializerPathsBtn = new JButton("Router Initializer Paths");
+        this.getPotentialPathsFromJSBtn = new JButton("Potential Paths From JS");
+        this.searchSitemapOnlyCheckbox = new JCheckBox("Search sitemap only", true);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
         
@@ -505,6 +511,20 @@ public class ActionsTab {
         getNavItemsBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getNavItemsBtn, gbc);
 
+        gbc.gridx = 1;
+        getRouterInitializerPathsBtn.setToolTipText("Discover router initializer paths");
+        getRouterInitializerPathsBtn.setEnabled(false); // Initially disabled until baseline request is selected
+        actionsPanel.add(getRouterInitializerPathsBtn, gbc);
+
+        gbc.gridy++; gbc.gridx = 0;
+        getPotentialPathsFromJSBtn.setToolTipText("Discover potential paths from JavaScript");
+        getPotentialPathsFromJSBtn.setEnabled(false); // Initially disabled until baseline request is selected
+        actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
+
+        gbc.gridx = 1;
+        searchSitemapOnlyCheckbox.setToolTipText("When checked, limit search to sitemap only (default: enabled)");
+        actionsPanel.add(searchSitemapOnlyCheckbox, gbc);
+
         // Thread count configuration
         gbc.gridy++; gbc.gridwidth = 2; gbc.weighty = 0.0;
         JPanel threadPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
@@ -625,6 +645,8 @@ public class ActionsTab {
         findDefaultObjectsPresetBtn.setEnabled(false);
         getRecordByIdBtn.setEnabled(false);
         getNavItemsBtn.setEnabled(false);
+        getRouterInitializerPathsBtn.setEnabled(false);
+        getPotentialPathsFromJSBtn.setEnabled(false);
 
         // Disable all input controls
         requestSelector.setEnabled(false);
@@ -919,6 +941,30 @@ public class ActionsTab {
             api.logging().logToError("Route discovery failed: " + e.getMessage());
             throw e;
         }
+    }
+
+    /**
+     * TODO: Implement Router Initializer Paths discovery
+     * Should respect the searchSitemapOnlyCheckbox state
+     */
+    private void performRouterInitializerPathsDiscovery(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
+        // TODO: Implementation will be provided later
+        api.logging().logToOutput("Starting router initializer paths discovery (sitemap only: " + sitemapOnly + ")...");
+
+        // For now, throw exception to indicate not implemented
+        throw new UnsupportedOperationException("Router Initializer Paths discovery not yet implemented");
+    }
+
+    /**
+     * TODO: Implement Potential Paths From JS discovery
+     * Should respect the searchSitemapOnlyCheckbox state
+     */
+    private void performPotentialPathsFromJSDiscovery(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
+        // TODO: Implementation will be provided later
+        api.logging().logToOutput("Starting potential paths from JS discovery (sitemap only: " + sitemapOnly + ")...");
+
+        // For now, throw exception to indicate not implemented
+        throw new UnsupportedOperationException("Potential Paths From JS discovery not yet implemented");
     }
 
     /**
@@ -2094,6 +2140,8 @@ public class ActionsTab {
         findDefaultObjectsPresetBtn.addActionListener(e -> executeAction("FindDefaultObjectsPreset"));
         getRecordByIdBtn.addActionListener(e -> executeAction("GetRecordById"));
         getNavItemsBtn.addActionListener(e -> executeAction("GetNavItems"));
+        getRouterInitializerPathsBtn.addActionListener(e -> executeAction("GetRouterInitializerPaths"));
+        getPotentialPathsFromJSBtn.addActionListener(e -> executeAction("GetPotentialPathsFromJS"));
 
         // Record ID field handler - enable/disable button based on text content
         recordIdField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -2423,6 +2471,54 @@ public class ActionsTab {
                     }
                 }, "RouteDiscovery-" + routeResultId).start();
                 break;
+            case "GetRouterInitializerPaths":
+                setBusyState(getRouterInitializerPathsBtn, "Router Initializer Paths Discovery");
+
+                // Generate result ID for router initializer paths discovery
+                String routerInitResultId = generateRouteDiscoveryResultId();
+
+                api.logging().logToOutput("Starting router initializer paths discovery...");
+
+                // Check sitemap only checkbox state
+                boolean sitemapOnlyRouter = searchSitemapOnlyCheckbox.isSelected();
+
+                // Perform router initializer paths discovery in background thread
+                ThreadManager.createManagedThread(() -> {
+                    try {
+                        performRouterInitializerPathsDiscovery(selectedRequest, routerInitResultId, sitemapOnlyRouter);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during router initializer paths discovery: " + e.getMessage());
+                            api.logging().logToError("Router initializer paths discovery failed: " + e.getMessage());
+                        });
+                    }
+                }, "RouterInitializerPaths-" + routerInitResultId).start();
+                break;
+            case "GetPotentialPathsFromJS":
+                setBusyState(getPotentialPathsFromJSBtn, "Potential Paths From JS Discovery");
+
+                // Generate result ID for potential paths from JS discovery
+                String jsPathsResultId = generateRouteDiscoveryResultId();
+
+                api.logging().logToOutput("Starting potential paths from JS discovery...");
+
+                // Check sitemap only checkbox state
+                boolean sitemapOnlyJS = searchSitemapOnlyCheckbox.isSelected();
+
+                // Perform potential paths from JS discovery in background thread
+                ThreadManager.createManagedThread(() -> {
+                    try {
+                        performPotentialPathsFromJSDiscovery(selectedRequest, jsPathsResultId, sitemapOnlyJS);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during potential paths from JS discovery: " + e.getMessage());
+                            api.logging().logToError("Potential paths from JS discovery failed: " + e.getMessage());
+                        });
+                    }
+                }, "PotentialPathsFromJS-" + jsPathsResultId).start();
+                break;
         }
     }
     
@@ -2465,8 +2561,10 @@ public class ActionsTab {
         // Wordlist button only depends on having requests
         findDefaultObjectsPresetBtn.setEnabled(hasRequests);
 
-        // Route discovery button only depends on having requests
+        // Route discovery buttons only depend on having requests
         getNavItemsBtn.setEnabled(hasRequests);
+        getRouterInitializerPathsBtn.setEnabled(hasRequests);
+        getPotentialPathsFromJSBtn.setEnabled(hasRequests);
 
         // Get Record by ID depends on both having requests and non-empty record ID
         updateRecordByIdButtonState();
