@@ -515,12 +515,12 @@ public class ActionsTab {
         // Passive sitemap parsing (no HTTP requests)
         gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
         getRouterInitializerPathsBtn.setToolTipText("Parse existing sitemap for router initializer paths (passive)");
-        getRouterInitializerPathsBtn.setEnabled(false); // Initially disabled until baseline request is selected
+        getRouterInitializerPathsBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(getRouterInitializerPathsBtn, gbc);
 
         gbc.gridx = 1;
         getPotentialPathsFromJSBtn.setToolTipText("Parse existing sitemap for JavaScript paths (passive)");
-        getPotentialPathsFromJSBtn.setEnabled(false); // Initially disabled until baseline request is selected
+        getPotentialPathsFromJSBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
 
         gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
@@ -949,6 +949,7 @@ public class ActionsTab {
      * TODO: Implement passive sitemap parsing for router initializer paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
+     * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapRouterPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
         // TODO: Implementation will be provided later
@@ -962,6 +963,7 @@ public class ActionsTab {
      * TODO: Implement passive sitemap parsing for JavaScript paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
+     * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapJSPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
         // TODO: Implementation will be provided later
@@ -2223,16 +2225,27 @@ public class ActionsTab {
         }
         
         RequestItem selectedItem = (RequestItem) requestSelector.getSelectedItem();
-        if (selectedItem == null) {
+
+        // Check if this is a passive operation that doesn't require a baseline request
+        boolean isPassiveOperation = "GetRouterInitializerPaths".equals(actionType) ||
+                                   "GetPotentialPathsFromJS".equals(actionType);
+
+        if (selectedItem == null && !isPassiveOperation) {
             return;
         }
-        
-        BaseRequest selectedRequest = selectedItem.getBaseRequest();
+
+        final BaseRequest selectedRequest = (selectedItem != null) ? selectedItem.getBaseRequest() : null;
+
         String objectName = objectNameField.getText().trim();
-        
+
         // Log the action (placeholder for actual implementation)
-        api.logging().logToOutput("Executing action: " + actionType + 
-                                " on request ID: " + selectedRequest.getId());
+        if (selectedRequest != null) {
+            api.logging().logToOutput("Executing action: " + actionType +
+                                    " on request ID: " + selectedRequest.getId());
+        } else {
+            api.logging().logToOutput("Executing passive action: " + actionType +
+                                    " (no baseline request required)");
+        }
         
         switch (actionType) {
             case "FindAllObjectNames":
@@ -2565,10 +2578,12 @@ public class ActionsTab {
         // Wordlist button only depends on having requests
         findDefaultObjectsPresetBtn.setEnabled(hasRequests);
 
-        // Route discovery buttons only depend on having requests
+        // Active route discovery (requires HTTP requests) depends on having baseline requests
         getNavItemsBtn.setEnabled(hasRequests);
-        getRouterInitializerPathsBtn.setEnabled(hasRequests);
-        getPotentialPathsFromJSBtn.setEnabled(hasRequests);
+
+        // Passive route discovery buttons (sitemap parsing) don't require baseline requests
+        getRouterInitializerPathsBtn.setEnabled(true);
+        getPotentialPathsFromJSBtn.setEnabled(true);
 
         // Get Record by ID depends on both having requests and non-empty record ID
         updateRecordByIdButtonState();
