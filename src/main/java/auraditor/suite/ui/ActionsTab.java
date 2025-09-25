@@ -331,13 +331,38 @@ public class ActionsTab {
 
     // Router initializer paths parsing fields
     private volatile boolean routerPathsCancelled = false;
+    private volatile boolean jsPathsCancelled = false;
     private volatile boolean operationCancelled = false;
     private Set<String> discoveredRouterPaths = ConcurrentHashMap.newKeySet();
+    private Set<String> discoveredJSPaths = ConcurrentHashMap.newKeySet();
     private RouteDiscoveryResult currentRouterPathsResults = null;
+    private RouteDiscoveryResult currentJSPathsResults = null;
 
     // Compiled regex patterns for router initializer extraction
     private static final Pattern ROUTER_INITIALIZER_PATTERN = Pattern.compile(
         "\"componentDef\":\\s*\\{[^}]*\"descriptor\":\\s*\"[^\"]*routerInitializer\"",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    // Compiled regex patterns for JavaScript path extraction
+    private static final Pattern JS_RELATIVE_PATH_PATTERN = Pattern.compile(
+        "(?:[\"'`])((?:\\.{0,2}/|/)[^\"'`\\s<>{}\\[\\]\\\\]+(?:/[^\"'`\\s<>{}\\[\\]\\\\]*)*(?:\\.[a-zA-Z0-9]{1,10})?)(?:[\"'`])",
+        Pattern.MULTILINE
+    );
+
+    private static final Pattern JS_URL_PATH_PATTERN = Pattern.compile(
+        "(?:[\"'`])(https?://[^/\"'`\\s<>{}\\[\\]\\\\]+(/[^\"'`\\s<>{}\\[\\]\\\\]*(?:/[^\"'`\\s<>{}\\[\\]\\\\]*)*)?)(?:[\"'`])",
+        Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern JS_PARAMETERIZED_PATH_PATTERN = Pattern.compile(
+        "(?:[\"'`])((?:\\.{0,2}/|/)[^\"'`\\s<>{}\\[\\]\\\\]*\\{[^}]+\\}[^\"'`\\s<>{}\\[\\]\\\\]*(?:/[^\"'`\\s<>{}\\[\\]\\\\]*)*)(?:[\"'`])",
+        Pattern.MULTILINE
+    );
+
+    // Pattern to exclude regex patterns and other non-path strings
+    private static final Pattern JS_EXCLUDE_PATTERN = Pattern.compile(
+        ".*(?:\\\\[dDwWsSbBrntfv]|\\[\\^?[^\\]]*\\]|\\{\\d+(?:,\\d*)?\\}|\\(\\?[:=!<]|\\\\[uUx][0-9a-fA-F]|function\\s*\\(|var\\s+|let\\s+|const\\s+|return\\s+).*",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern ROUTES_PATTERN = Pattern.compile(
@@ -1164,6 +1189,11 @@ public class ActionsTab {
         api.logging().logToOutput("Router paths parsing cancellation requested");
     }
 
+    private void cancelJSPathsParsing() {
+        jsPathsCancelled = true;
+        api.logging().logToOutput("JS paths parsing cancellation requested");
+    }
+
     /**
      * TODO: Implement passive sitemap parsing for potential JavaScript paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
@@ -1175,11 +1205,265 @@ public class ActionsTab {
      * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapJSPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
-        // TODO: Implementation will be provided later
         api.logging().logToOutput("Starting passive sitemap parsing for JS paths (sitemap only: " + sitemapOnly + ")...");
 
-        // For now, throw exception to indicate not implemented
-        throw new UnsupportedOperationException("Passive sitemap JS paths parsing not yet implemented");
+        try {
+            // Reset cancellation flag and discovered paths
+            jsPathsCancelled = false;
+            discoveredJSPaths.clear();
+
+            // Initialize results
+            currentJSPathsResults = new RouteDiscoveryResult();
+            String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // Get sitemap items
+            api.logging().logToOutput("Retrieving sitemap entries...");
+            List<HttpRequestResponse> sitemapItems = new ArrayList<>();
+
+            // Get all sitemap items (use proxy history as sitemap equivalent)
+            for (var proxyItem : api.proxy().history()) {
+                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
+                    proxyItem.finalRequest(),
+                    proxyItem.originalResponse()
+                ));
+            }
+
+            api.logging().logToOutput("Total sitemap items retrieved: " + sitemapItems.size());
+
+            // Filter for JavaScript responses
+            List<HttpRequestResponse> jsResponses = new ArrayList<>();
+            for (HttpRequestResponse item : sitemapItems) {
+                // Check for cancellation
+                if (jsPathsCancelled || operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("JS paths parsing cancelled by user");
+                    return;
+                }
+
+                try {
+                    if (item.response() != null &&
+                        item.response().mimeType() == MimeType.SCRIPT) {
+
+                        // Apply scope filtering if enabled
+                        if (!sitemapOnly || api.scope().isInScope(item.request().url())) {
+                            jsResponses.add(item);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip malformed items
+                    api.logging().logToOutput("Skipping malformed sitemap item: " + e.getMessage());
+                    continue;
+                }
+            }
+
+            api.logging().logToOutput("Found " + jsResponses.size() + " JavaScript responses to analyze");
+
+            if (jsResponses.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    clearBusyState();
+                    showStatusMessage("No JavaScript responses found in sitemap", Color.ORANGE);
+                });
+                return;
+            }
+
+            // Process JavaScript responses to extract paths
+            int totalResponses = jsResponses.size();
+            int processedResponses = 0;
+
+            for (HttpRequestResponse jsResponse : jsResponses) {
+                // Check for cancellation
+                if (jsPathsCancelled || operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("JS paths parsing cancelled by user");
+                    SwingUtilities.invokeLater(() -> {
+                        clearBusyState();
+                        if (!discoveredJSPaths.isEmpty()) {
+                            showStatusMessage("Operation cancelled - " + discoveredJSPaths.size() + " JS paths found so far", Color.ORANGE);
+                            // Create tab with whatever data was collected
+                            if (resultTabCallback != null && currentJSPathsResults != null) {
+                                resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                            }
+                        } else {
+                            showStatusMessage("Operation cancelled", Color.RED);
+                        }
+                    });
+                    return;
+                }
+
+                processedResponses++;
+                final int currentProgress = (processedResponses * 100) / totalResponses;
+
+                SwingUtilities.invokeLater(() -> {
+                    getPotentialPathsFromJSBtn.setText("⟳ JS Paths (" + currentProgress + "%)");
+                });
+
+                try {
+                    processJavaScriptResponseForPaths(jsResponse, baseRequest);
+                } catch (Exception e) {
+                    api.logging().logToError("Error processing JavaScript response for paths: " + e.getMessage());
+                }
+            }
+
+            api.logging().logToOutput("Completed JS paths parsing. Found " + discoveredJSPaths.size() + " unique paths");
+
+            // Finalize results
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                if (!discoveredJSPaths.isEmpty()) {
+                    showStatusMessage("✓ JS Paths parsing completed - " + discoveredJSPaths.size() + " paths found", Color.GREEN);
+                    if (resultTabCallback != null && currentJSPathsResults != null) {
+                        resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                    }
+                } else {
+                    showStatusMessage("JS Paths parsing completed - no paths found", Color.ORANGE);
+                }
+            });
+
+        } catch (Exception e) {
+            api.logging().logToError("Exception in parseSitemapJSPaths: " + e.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showStatusMessage("Error during JS paths parsing: " + e.getMessage(), Color.RED);
+            });
+        }
+    }
+
+    /**
+     * Process a JavaScript response to extract meaningful paths
+     */
+    private void processJavaScriptResponseForPaths(HttpRequestResponse jsResponse, BaseRequest baseRequest) {
+        if (jsResponse == null || jsResponse.response() == null) {
+            return;
+        }
+
+        try {
+            String responseBody = jsResponse.response().bodyToString();
+            String sourceUrl = jsResponse.request().url();
+
+            // Extract the base domain for absolute URL filtering
+            String baseDomain = null;
+            try {
+                java.net.URI uri = new java.net.URI(sourceUrl);
+                baseDomain = uri.getHost();
+            } catch (Exception e) {
+                api.logging().logToOutput("Could not parse source URL for domain extraction: " + sourceUrl);
+            }
+
+            // Extract relative paths (starting with /, ./, ../)
+            Matcher relativeMatcher = JS_RELATIVE_PATH_PATTERN.matcher(responseBody);
+            while (relativeMatcher.find()) {
+                String path = relativeMatcher.group(1);
+                if (isValidJSPath(path)) {
+                    addJSPathToResults(path, "Relative Path", jsResponse);
+                }
+            }
+
+            // Extract parameterized paths (with placeholders like {id})
+            Matcher paramMatcher = JS_PARAMETERIZED_PATH_PATTERN.matcher(responseBody);
+            while (paramMatcher.find()) {
+                String path = paramMatcher.group(1);
+                if (isValidJSPath(path)) {
+                    addJSPathToResults(path, "Parameterized Path", jsResponse);
+                }
+            }
+
+            // Extract absolute URLs and filter for same domain
+            if (baseDomain != null) {
+                Matcher urlMatcher = JS_URL_PATH_PATTERN.matcher(responseBody);
+                while (urlMatcher.find()) {
+                    String fullUrl = urlMatcher.group(1);
+                    String urlPath = urlMatcher.group(2);
+
+                    try {
+                        java.net.URI fullUri = new java.net.URI(fullUrl);
+                        // Only include URLs from the same domain
+                        if (baseDomain.equalsIgnoreCase(fullUri.getHost()) && urlPath != null && isValidJSPath(urlPath)) {
+                            addJSPathToResults(urlPath, "Same-Domain Path", jsResponse);
+                        }
+                    } catch (Exception e) {
+                        // Skip malformed URLs
+                        continue;
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Exception processing JavaScript response for paths: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Validate if a discovered path is meaningful and should be included
+     */
+    private boolean isValidJSPath(String path) {
+        if (path == null || path.trim().isEmpty()) {
+            return false;
+        }
+
+        path = path.trim();
+
+        // Exclude paths containing quotes
+        if (path.contains("'") || path.contains("\"")) {
+            return false;
+        }
+
+        // Exclude obvious non-paths
+        if (path.length() < 2 || path.equals("/") || path.equals("./") || path.equals("../")) {
+            return false;
+        }
+
+        // Exclude regex patterns and JavaScript code patterns
+        if (JS_EXCLUDE_PATTERN.matcher(path).matches()) {
+            return false;
+        }
+
+        // Exclude common non-path patterns
+        if (path.matches(".*\\b(function|var|let|const|return|if|else|for|while|switch|case)\\b.*")) {
+            return false;
+        }
+
+        // Exclude data URLs and javascript URLs
+        if (path.toLowerCase().startsWith("data:") || path.toLowerCase().startsWith("javascript:")) {
+            return false;
+        }
+
+        // Must look like a path (contain at least one meaningful character)
+        if (!path.matches(".*[a-zA-Z0-9_-].*")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Add a discovered JS path to the results, handling duplicates
+     */
+    private void addJSPathToResults(String path, String pathType, HttpRequestResponse sourceResponse) {
+        if (path == null || discoveredJSPaths.contains(path)) {
+            return; // Skip duplicates
+        }
+
+        // Add to discovered set
+        discoveredJSPaths.add(path);
+
+        // Add to results by category
+        if (currentJSPathsResults != null) {
+            // Get existing routes for this path type, or create new list
+            java.util.List<String> existingRoutes = currentJSPathsResults.getRoutesForCategory(pathType);
+            if (existingRoutes == null) {
+                existingRoutes = new java.util.ArrayList<>();
+            } else {
+                existingRoutes = new java.util.ArrayList<>(existingRoutes); // Create mutable copy
+            }
+
+            // Add the new path with source info
+            String pathWithSource = path + " (from: " + sourceResponse.request().url() + ")";
+            existingRoutes.add(pathWithSource);
+
+            // Update the category
+            currentJSPathsResults.addRouteCategory(pathType, existingRoutes);
+
+            api.logging().logToOutput("Found JS path: " + path + " (" + pathType + ")");
+        }
     }
 
     /**
