@@ -22,8 +22,12 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+import java.util.Map;
 import java.util.HashSet;
 
 /**
@@ -323,7 +327,26 @@ public class ActionsTab {
     private String currentBulkRetrievalTabId = null;
     private JLabel progressLabel;
     private Thread currentOperationThread = null;
+
+    // Router initializer paths parsing fields
+    private volatile boolean routerPathsCancelled = false;
     private volatile boolean operationCancelled = false;
+    private Set<String> discoveredRouterPaths = ConcurrentHashMap.newKeySet();
+    private RouteDiscoveryResult currentRouterPathsResults = null;
+
+    // Compiled regex patterns for router initializer extraction
+    private static final Pattern ROUTER_INITIALIZER_PATTERN = Pattern.compile(
+        "\"componentDef\":\\s*\\{[^}]*\"descriptor\":\\s*\"[^\"]*routerInitializer\"",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern ROUTES_PATTERN = Pattern.compile(
+        "\"routes\":\\s*\\{([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)\\}",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern ROUTE_PATH_PATTERN = Pattern.compile(
+        "\"(/[^\"]+)\":\\s*\\{",
+        Pattern.CASE_INSENSITIVE
+    );
     
     // Object storage for discovered objects
     private final Set<String> discoveredDefaultObjects = new HashSet<>();
@@ -956,11 +979,189 @@ public class ActionsTab {
      * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapRouterPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
-        // TODO: Implementation will be provided later
-        api.logging().logToOutput("Starting passive sitemap parsing for router paths (sitemap only: " + sitemapOnly + ")...");
+        api.logging().logToOutput("Starting passive sitemap parsing for router initializer paths (sitemap only: " + sitemapOnly + ")...");
 
-        // For now, throw exception to indicate not implemented
-        throw new UnsupportedOperationException("Passive sitemap router paths parsing not yet implemented");
+        try {
+            // Reset cancellation flag and discovered paths
+            routerPathsCancelled = false;
+            discoveredRouterPaths.clear();
+
+            // Initialize results
+            currentRouterPathsResults = new RouteDiscoveryResult();
+            String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // Get sitemap items
+            api.logging().logToOutput("Retrieving sitemap entries...");
+            List<HttpRequestResponse> sitemapItems = new ArrayList<>();
+
+            // Get all sitemap items (use proxy history as sitemap equivalent)
+            for (var proxyItem : api.proxy().history()) {
+                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
+                    proxyItem.finalRequest(),
+                    proxyItem.originalResponse()
+                ));
+            }
+
+            // Filter for JavaScript content-type and optionally scope
+            List<HttpRequestResponse> jsResponses = new ArrayList<>();
+            for (HttpRequestResponse item : sitemapItems) {
+                if (routerPathsCancelled) {
+                    api.logging().logToOutput("Router paths parsing cancelled by user");
+                    return;
+                }
+
+                try {
+                    if (item.response() != null &&
+                        item.response().hasHeader("content-type") &&
+                        item.response().headerValue("content-type").toLowerCase().contains("text/javascript")) {
+
+                        // Apply scope filtering if enabled
+                        if (!sitemapOnly || api.scope().isInScope(item.request().url())) {
+                            jsResponses.add(item);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip malformed items
+                    api.logging().logToOutput("Skipping malformed sitemap item: " + e.getMessage());
+                    continue;
+                }
+            }
+
+            api.logging().logToOutput("Found " + jsResponses.size() + " JavaScript responses to analyze");
+
+            // Progress tracking
+            AtomicInteger processedItems = new AtomicInteger(0);
+            int totalItems = jsResponses.size();
+
+            if (totalItems == 0) {
+                SwingUtilities.invokeLater(() -> {
+                    clearBusyState();
+                    showStatusMessage("No JavaScript responses found in sitemap", Color.ORANGE);
+                });
+                return;
+            }
+
+            // Process each JavaScript response
+            for (HttpRequestResponse item : jsResponses) {
+                if (routerPathsCancelled) {
+                    api.logging().logToOutput("Router paths parsing cancelled by user");
+                    SwingUtilities.invokeLater(() -> {
+                        clearBusyState();
+                        showStatusMessage("Router paths parsing cancelled", Color.ORANGE);
+                    });
+                    return;
+                }
+
+                try {
+                    // Process the JavaScript response
+                    processJavaScriptResponseForRouterPaths(item, resultId);
+
+                    // Update progress
+                    int processed = processedItems.incrementAndGet();
+                    int progress = (processed * 100) / totalItems;
+
+                    SwingUtilities.invokeLater(() -> {
+                        // Update button text with progress
+                        getRouterInitializerPathsBtn.setText("⟳ Router Paths (" + progress + "%)");
+                    });
+
+                } catch (Exception e) {
+                    api.logging().logToOutput("Error processing JavaScript response: " + e.getMessage());
+                    processedItems.incrementAndGet(); // Still count as processed
+                    continue;
+                }
+            }
+
+            // Completion
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                int pathsFound = discoveredRouterPaths.size();
+                showStatusMessage("✓ Router paths parsing completed: " + pathsFound + " unique paths found",
+                                pathsFound > 0 ? Color.GREEN : Color.ORANGE);
+
+                api.logging().logToOutput("Router paths parsing completed successfully:");
+                api.logging().logToOutput("  JavaScript responses analyzed: " + totalItems);
+                api.logging().logToOutput("  Unique router paths found: " + pathsFound);
+            });
+
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showErrorMessage("Failed to parse router paths from sitemap: " + e.getMessage());
+            });
+            throw new RuntimeException("Failed to parse router paths from sitemap", e);
+        }
+    }
+
+    /**
+     * Process a JavaScript response to extract router initializer paths
+     */
+    private void processJavaScriptResponseForRouterPaths(HttpRequestResponse item, String resultId) {
+        try {
+            String responseBody = item.response().bodyToString();
+
+            // First check if this response contains routerInitializer
+            Matcher routerMatcher = ROUTER_INITIALIZER_PATTERN.matcher(responseBody);
+            if (!routerMatcher.find()) {
+                return; // No routerInitializer found in this response
+            }
+
+            // Look for routes object in the same response
+            Matcher routesMatcher = ROUTES_PATTERN.matcher(responseBody);
+            while (routesMatcher.find()) {
+                String routesContent = routesMatcher.group(1);
+
+                // Extract individual route paths
+                Matcher pathMatcher = ROUTE_PATH_PATTERN.matcher(routesContent);
+                while (pathMatcher.find()) {
+                    String routePath = pathMatcher.group(1);
+
+                    // Add to discovered paths (Set automatically handles duplicates)
+                    if (discoveredRouterPaths.add(routePath)) {
+                        // New path discovered - add to results immediately
+                        SwingUtilities.invokeLater(() -> {
+                            addRouterPathToResults(routePath, resultId);
+                        });
+
+                        api.logging().logToOutput("Found router path: " + routePath);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToOutput("Error extracting router paths from JavaScript response: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Add a router path to the results tab immediately
+     */
+    private void addRouterPathToResults(String path, String resultId) {
+        if (currentRouterPathsResults != null) {
+            String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String categoryName = "Router Initializer Paths (" + timestamp + ")";
+
+            // Add the path to results
+            List<String> paths = currentRouterPathsResults.getRoutesForCategory(categoryName);
+            if (paths == null) {
+                paths = new ArrayList<>();
+                currentRouterPathsResults.addRouteCategory(categoryName, paths);
+            }
+            paths.add(path);
+
+            // Update the results tab
+            resultTabCallback.updateDiscoveredRoutesTab(resultId, currentRouterPathsResults);
+        }
+    }
+
+    /**
+     * Cancel router paths parsing operation
+     */
+    private void cancelRouterPathsParsing() {
+        routerPathsCancelled = true;
+        api.logging().logToOutput("Router paths parsing cancellation requested");
     }
 
     /**
@@ -2183,6 +2384,7 @@ public class ActionsTab {
         cancelBtn.addActionListener(e -> {
             api.logging().logToOutput("Operation cancelled by user - stopping all requests");
             operationCancelled = true; // Set cancellation flag immediately
+            routerPathsCancelled = true; // Cancel router paths parsing if in progress
 
             // More aggressive thread stopping
             if (currentOperationThread != null && currentOperationThread.isAlive()) {
