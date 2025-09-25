@@ -364,8 +364,8 @@ public class ActionsTab {
         this.getRecordByIdBtn = new JButton("Get Record by ID");
         this.recordIdField = new JTextField(15);
         this.getNavItemsBtn = new JButton("Get Nav Items");
-        this.getRouterInitializerPathsBtn = new JButton("Parse Sitemap Router Paths");
-        this.getPotentialPathsFromJSBtn = new JButton("Parse Sitemap JS Paths");
+        this.getRouterInitializerPathsBtn = new JButton("Router Initializer Paths From Sitemap");
+        this.getPotentialPathsFromJSBtn = new JButton("Potential Paths From Sitemap");
         this.searchSitemapOnlyCheckbox = new JCheckBox("Search sitemap only", true);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
@@ -507,19 +507,19 @@ public class ActionsTab {
 
         // Active route discovery (sends HTTP request)
         gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
-        getNavItemsBtn.setText("Get Nav Items (Active Search)");
-        getNavItemsBtn.setToolTipText("Actively discover navigation items and routes by sending HTTP request");
+        getNavItemsBtn.setText("Get Nav Items");
+        getNavItemsBtn.setToolTipText("Discover navigation items and routes by sending HTTP request");
         getNavItemsBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getNavItemsBtn, gbc);
 
         // Passive sitemap parsing (no HTTP requests)
         gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
-        getRouterInitializerPathsBtn.setToolTipText("Parse existing sitemap for router initializer paths (passive)");
+        getRouterInitializerPathsBtn.setToolTipText("Extract router initializer paths from existing sitemap data (passive)");
         getRouterInitializerPathsBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(getRouterInitializerPathsBtn, gbc);
 
         gbc.gridx = 1;
-        getPotentialPathsFromJSBtn.setToolTipText("Parse existing sitemap for JavaScript paths (passive)");
+        getPotentialPathsFromJSBtn.setToolTipText("Extract potential paths from JavaScript files in sitemap (passive)");
         getPotentialPathsFromJSBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
 
@@ -949,6 +949,10 @@ public class ActionsTab {
      * TODO: Implement passive sitemap parsing for router initializer paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
+     *
+     * NOTE: In the future, this method may be merged with parseSitemapJSPaths() to avoid
+     * parsing the sitemap twice for efficiency. Currently kept separate for implementation phase.
+     *
      * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapRouterPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
@@ -960,9 +964,13 @@ public class ActionsTab {
     }
 
     /**
-     * TODO: Implement passive sitemap parsing for JavaScript paths
+     * TODO: Implement passive sitemap parsing for potential JavaScript paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
+     *
+     * NOTE: In the future, this method may be merged with parseSitemapRouterPaths() to avoid
+     * parsing the sitemap twice for efficiency. Currently kept separate for implementation phase.
+     *
      * @param baseRequest Can be null since passive operations don't require baseline HTTP requests
      */
     private void parseSitemapJSPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
