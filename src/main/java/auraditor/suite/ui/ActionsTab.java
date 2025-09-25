@@ -10,6 +10,7 @@ import auraditor.suite.BaseRequest;
 import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.http.message.MimeType;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1013,8 +1014,7 @@ public class ActionsTab {
 
                 try {
                     if (item.response() != null &&
-                        item.response().hasHeader("content-type") &&
-                        item.response().headerValue("content-type").toLowerCase().contains("text/javascript")) {
+                        item.response().mimeType() == MimeType.SCRIPT) {
 
                         // Apply scope filtering if enabled
                         if (!sitemapOnly || api.scope().isInScope(item.request().url())) {
