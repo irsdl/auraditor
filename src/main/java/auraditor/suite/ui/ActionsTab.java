@@ -364,8 +364,8 @@ public class ActionsTab {
         this.getRecordByIdBtn = new JButton("Get Record by ID");
         this.recordIdField = new JTextField(15);
         this.getNavItemsBtn = new JButton("Get Nav Items");
-        this.getRouterInitializerPathsBtn = new JButton("Router Initializer Paths");
-        this.getPotentialPathsFromJSBtn = new JButton("Potential Paths From JS");
+        this.getRouterInitializerPathsBtn = new JButton("Parse Sitemap Router Paths");
+        this.getPotentialPathsFromJSBtn = new JButton("Parse Sitemap JS Paths");
         this.searchSitemapOnlyCheckbox = new JCheckBox("Search sitemap only", true);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
@@ -505,24 +505,26 @@ public class ActionsTab {
         routeLabel.setFont(routeLabel.getFont().deriveFont(Font.BOLD, 14f));
         actionsPanel.add(routeLabel, gbc);
 
-        gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
-        getNavItemsBtn.setText("Get Nav Items");
-        getNavItemsBtn.setToolTipText("Discover navigation items and routes (sends 1 request)");
+        // Active route discovery (sends HTTP request)
+        gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
+        getNavItemsBtn.setText("Get Nav Items (Active Search)");
+        getNavItemsBtn.setToolTipText("Actively discover navigation items and routes by sending HTTP request");
         getNavItemsBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getNavItemsBtn, gbc);
 
-        gbc.gridx = 1;
-        getRouterInitializerPathsBtn.setToolTipText("Discover router initializer paths");
+        // Passive sitemap parsing (no HTTP requests)
+        gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
+        getRouterInitializerPathsBtn.setToolTipText("Parse existing sitemap for router initializer paths (passive)");
         getRouterInitializerPathsBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getRouterInitializerPathsBtn, gbc);
 
-        gbc.gridy++; gbc.gridx = 0;
-        getPotentialPathsFromJSBtn.setToolTipText("Discover potential paths from JavaScript");
+        gbc.gridx = 1;
+        getPotentialPathsFromJSBtn.setToolTipText("Parse existing sitemap for JavaScript paths (passive)");
         getPotentialPathsFromJSBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
 
-        gbc.gridx = 1;
-        searchSitemapOnlyCheckbox.setToolTipText("When checked, limit search to sitemap only (default: enabled)");
+        gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
+        searchSitemapOnlyCheckbox.setToolTipText("When checked, limit passive parsing to sitemap only (applies to sitemap parsing buttons above)");
         actionsPanel.add(searchSitemapOnlyCheckbox, gbc);
 
         // Thread count configuration
@@ -944,27 +946,29 @@ public class ActionsTab {
     }
 
     /**
-     * TODO: Implement Router Initializer Paths discovery
+     * TODO: Implement passive sitemap parsing for router initializer paths
+     * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
      */
-    private void performRouterInitializerPathsDiscovery(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
+    private void parseSitemapRouterPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
         // TODO: Implementation will be provided later
-        api.logging().logToOutput("Starting router initializer paths discovery (sitemap only: " + sitemapOnly + ")...");
+        api.logging().logToOutput("Starting passive sitemap parsing for router paths (sitemap only: " + sitemapOnly + ")...");
 
         // For now, throw exception to indicate not implemented
-        throw new UnsupportedOperationException("Router Initializer Paths discovery not yet implemented");
+        throw new UnsupportedOperationException("Passive sitemap router paths parsing not yet implemented");
     }
 
     /**
-     * TODO: Implement Potential Paths From JS discovery
+     * TODO: Implement passive sitemap parsing for JavaScript paths
+     * This is a passive operation that parses existing sitemap data without sending HTTP requests
      * Should respect the searchSitemapOnlyCheckbox state
      */
-    private void performPotentialPathsFromJSDiscovery(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
+    private void parseSitemapJSPaths(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
         // TODO: Implementation will be provided later
-        api.logging().logToOutput("Starting potential paths from JS discovery (sitemap only: " + sitemapOnly + ")...");
+        api.logging().logToOutput("Starting passive sitemap parsing for JS paths (sitemap only: " + sitemapOnly + ")...");
 
         // For now, throw exception to indicate not implemented
-        throw new UnsupportedOperationException("Potential Paths From JS discovery not yet implemented");
+        throw new UnsupportedOperationException("Passive sitemap JS paths parsing not yet implemented");
     }
 
     /**
@@ -2472,49 +2476,49 @@ public class ActionsTab {
                 }, "RouteDiscovery-" + routeResultId).start();
                 break;
             case "GetRouterInitializerPaths":
-                setBusyState(getRouterInitializerPathsBtn, "Router Initializer Paths Discovery");
+                setBusyState(getRouterInitializerPathsBtn, "Sitemap Router Paths Parsing");
 
-                // Generate result ID for router initializer paths discovery
+                // Generate result ID for sitemap router paths parsing
                 String routerInitResultId = generateRouteDiscoveryResultId();
 
-                api.logging().logToOutput("Starting router initializer paths discovery...");
+                api.logging().logToOutput("Starting passive sitemap router paths parsing...");
 
                 // Check sitemap only checkbox state
                 boolean sitemapOnlyRouter = searchSitemapOnlyCheckbox.isSelected();
 
-                // Perform router initializer paths discovery in background thread
+                // Perform passive sitemap router paths parsing in background thread
                 ThreadManager.createManagedThread(() -> {
                     try {
-                        performRouterInitializerPathsDiscovery(selectedRequest, routerInitResultId, sitemapOnlyRouter);
+                        parseSitemapRouterPaths(selectedRequest, routerInitResultId, sitemapOnlyRouter);
                     } catch (Exception e) {
                         SwingUtilities.invokeLater(() -> {
                             clearBusyState();
-                            showErrorMessage("Error during router initializer paths discovery: " + e.getMessage());
-                            api.logging().logToError("Router initializer paths discovery failed: " + e.getMessage());
+                            showErrorMessage("Error during sitemap router paths parsing: " + e.getMessage());
+                            api.logging().logToError("Sitemap router paths parsing failed: " + e.getMessage());
                         });
                     }
                 }, "RouterInitializerPaths-" + routerInitResultId).start();
                 break;
             case "GetPotentialPathsFromJS":
-                setBusyState(getPotentialPathsFromJSBtn, "Potential Paths From JS Discovery");
+                setBusyState(getPotentialPathsFromJSBtn, "Sitemap JS Paths Parsing");
 
-                // Generate result ID for potential paths from JS discovery
+                // Generate result ID for sitemap JS paths parsing
                 String jsPathsResultId = generateRouteDiscoveryResultId();
 
-                api.logging().logToOutput("Starting potential paths from JS discovery...");
+                api.logging().logToOutput("Starting passive sitemap JS paths parsing...");
 
                 // Check sitemap only checkbox state
                 boolean sitemapOnlyJS = searchSitemapOnlyCheckbox.isSelected();
 
-                // Perform potential paths from JS discovery in background thread
+                // Perform passive sitemap JS paths parsing in background thread
                 ThreadManager.createManagedThread(() -> {
                     try {
-                        performPotentialPathsFromJSDiscovery(selectedRequest, jsPathsResultId, sitemapOnlyJS);
+                        parseSitemapJSPaths(selectedRequest, jsPathsResultId, sitemapOnlyJS);
                     } catch (Exception e) {
                         SwingUtilities.invokeLater(() -> {
                             clearBusyState();
-                            showErrorMessage("Error during potential paths from JS discovery: " + e.getMessage());
-                            api.logging().logToError("Potential paths from JS discovery failed: " + e.getMessage());
+                            showErrorMessage("Error during sitemap JS paths parsing: " + e.getMessage());
+                            api.logging().logToError("Sitemap JS paths parsing failed: " + e.getMessage());
                         });
                     }
                 }, "PotentialPathsFromJS-" + jsPathsResultId).start();
