@@ -221,6 +221,51 @@ public class ActionsTab {
     /**
      * Data structure for route discovery results
      */
+    /**
+     * Data class for storing Apex descriptor information
+     */
+    public static class DescriptorInfo {
+        private final String descriptor;
+        private final java.util.List<ParameterInfo> parameters;
+        private final String sourceUrl;
+
+        public DescriptorInfo(String descriptor, java.util.List<ParameterInfo> parameters, String sourceUrl) {
+            this.descriptor = descriptor;
+            this.parameters = new java.util.ArrayList<>(parameters);
+            this.sourceUrl = sourceUrl;
+        }
+
+        public String getDescriptor() {
+            return descriptor;
+        }
+
+        public java.util.List<ParameterInfo> getParameters() {
+            return parameters;
+        }
+
+        public String getSourceUrl() {
+            return sourceUrl;
+        }
+
+        public static class ParameterInfo {
+            private final String name;
+            private final String type;
+
+            public ParameterInfo(String name, String type) {
+                this.name = name;
+                this.type = type;
+            }
+
+            public String getName() {
+                return name;
+            }
+
+            public String getType() {
+                return type;
+            }
+        }
+    }
+
     public static class RouteDiscoveryResult {
         private final java.util.Map<String, java.util.List<String>> routeEntries;
         private final String timestamp;
@@ -300,6 +345,7 @@ public class ActionsTab {
     private final JButton getNavItemsBtn;
     private final JButton getRouterInitializerPathsBtn;
     private final JButton getPotentialPathsFromJSBtn;
+    private final JButton findDescriptorsFromSitemapBtn;
     private final JCheckBox searchSitemapOnlyCheckbox;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
@@ -332,11 +378,14 @@ public class ActionsTab {
     // Router initializer paths parsing fields
     private volatile boolean routerPathsCancelled = false;
     private volatile boolean jsPathsCancelled = false;
+    private volatile boolean descriptorsCancelled = false;
     private volatile boolean operationCancelled = false;
     private Set<String> discoveredRouterPaths = ConcurrentHashMap.newKeySet();
     private Set<String> discoveredJSPaths = ConcurrentHashMap.newKeySet();
+    private Set<String> discoveredDescriptors = ConcurrentHashMap.newKeySet();
     private RouteDiscoveryResult currentRouterPathsResults = null;
     private RouteDiscoveryResult currentJSPathsResults = null;
+    private RouteDiscoveryResult currentDescriptorResults = null;
 
     // Compiled regex patterns for router initializer extraction
     private static final Pattern ROUTER_INITIALIZER_PATTERN = Pattern.compile(
@@ -363,6 +412,22 @@ public class ActionsTab {
     // Pattern to exclude regex patterns and other non-path strings
     private static final Pattern JS_EXCLUDE_PATTERN = Pattern.compile(
         ".*(?:\\\\[dDwWsSbBrntfv]|\\[\\^?[^\\]]*\\]|\\{\\d+(?:,\\d*)?\\}|\\(\\?[:=!<]|\\\\[uUx][0-9a-fA-F]|function\\s*\\(|var\\s+|let\\s+|const\\s+|return\\s+).*",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    // Compiled regex patterns for Apex descriptor extraction
+    private static final Pattern APEX_DESCRIPTOR_PATTERN = Pattern.compile(
+        "apex://[\\w\\._\\-$]+/ACTION\\$[\\w\\._\\-$]+",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern DESCRIPTOR_CONTEXT_PATTERN = Pattern.compile(
+        "\"descriptor\"\\s*:\\s*\"(apex://[\\w\\._\\-$]+/ACTION\\$[\\w\\._\\-$]+)\"[^}]*(?:\"pa\"\\s*:\\s*(\\[[^\\]]*\\]))?",
+        Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    private static final Pattern PARAMETER_PATTERN = Pattern.compile(
+        "\\{\\s*\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"type\"\\s*:\\s*\"([^\"]+)\"\\s*\\}",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern ROUTES_PATTERN = Pattern.compile(
@@ -415,6 +480,7 @@ public class ActionsTab {
         this.getNavItemsBtn = new JButton("Get Nav Items");
         this.getRouterInitializerPathsBtn = new JButton("Router Initializer Paths From Sitemap");
         this.getPotentialPathsFromJSBtn = new JButton("Potential Paths From Sitemap");
+        this.findDescriptorsFromSitemapBtn = new JButton("Find Descriptors From Sitemap");
         this.searchSitemapOnlyCheckbox = new JCheckBox("Search sitemap only", true);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
@@ -572,6 +638,11 @@ public class ActionsTab {
         getPotentialPathsFromJSBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
 
+        gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
+        findDescriptorsFromSitemapBtn.setToolTipText("Extract Apex descriptors from JavaScript files in sitemap (passive)");
+        findDescriptorsFromSitemapBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
+        actionsPanel.add(findDescriptorsFromSitemapBtn, gbc);
+
         gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
         searchSitemapOnlyCheckbox.setToolTipText("When checked, limit passive parsing to sitemap only (applies to sitemap parsing buttons above)");
         actionsPanel.add(searchSitemapOnlyCheckbox, gbc);
@@ -698,6 +769,7 @@ public class ActionsTab {
         getNavItemsBtn.setEnabled(false);
         getRouterInitializerPathsBtn.setEnabled(false);
         getPotentialPathsFromJSBtn.setEnabled(false);
+        findDescriptorsFromSitemapBtn.setEnabled(false);
 
         // Disable all input controls
         requestSelector.setEnabled(false);
@@ -1194,6 +1266,11 @@ public class ActionsTab {
         api.logging().logToOutput("JS paths parsing cancellation requested");
     }
 
+    private void cancelDescriptorsParsing() {
+        descriptorsCancelled = true;
+        api.logging().logToOutput("Descriptors parsing cancellation requested");
+    }
+
     /**
      * TODO: Implement passive sitemap parsing for potential JavaScript paths
      * This is a passive operation that parses existing sitemap data without sending HTTP requests
@@ -1325,6 +1402,301 @@ public class ActionsTab {
                 showStatusMessage("Error during JS paths parsing: " + e.getMessage(), Color.RED);
             });
         }
+    }
+
+    /**
+     * Parse sitemap for Apex descriptors and their parameters
+     * This is a passive operation that parses existing sitemap data without sending HTTP requests
+     * Should respect the searchSitemapOnlyCheckbox state
+     */
+    private void parseSitemapDescriptors(BaseRequest baseRequest, String resultId, boolean sitemapOnly) {
+        api.logging().logToOutput("Starting passive sitemap parsing for Apex descriptors (sitemap only: " + sitemapOnly + ")...");
+
+        try {
+            // Reset cancellation flag and discovered descriptors
+            descriptorsCancelled = false;
+            discoveredDescriptors.clear();
+
+            // Initialize results
+            currentDescriptorResults = new RouteDiscoveryResult();
+            String timestamp = java.time.LocalDateTime.now().format(
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // Get sitemap items
+            api.logging().logToOutput("Retrieving sitemap entries...");
+            List<HttpRequestResponse> sitemapItems = new ArrayList<>();
+
+            // Get all sitemap items (use proxy history as sitemap equivalent)
+            for (var proxyItem : api.proxy().history()) {
+                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
+                    proxyItem.finalRequest(),
+                    proxyItem.originalResponse()
+                ));
+            }
+
+            api.logging().logToOutput("Total sitemap items retrieved: " + sitemapItems.size());
+
+            // Filter for JavaScript responses
+            List<HttpRequestResponse> jsResponses = new ArrayList<>();
+            for (HttpRequestResponse item : sitemapItems) {
+                // Check for cancellation
+                if (descriptorsCancelled || operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("Descriptors parsing cancelled by user");
+                    return;
+                }
+
+                try {
+                    if (item.response() != null &&
+                        item.response().mimeType() == MimeType.SCRIPT) {
+
+                        // Apply scope filtering if enabled
+                        if (!sitemapOnly || api.scope().isInScope(item.request().url())) {
+                            jsResponses.add(item);
+                        }
+                    }
+                } catch (Exception e) {
+                    // Skip malformed items
+                    api.logging().logToOutput("Skipping malformed sitemap item: " + e.getMessage());
+                    continue;
+                }
+            }
+
+            api.logging().logToOutput("Found " + jsResponses.size() + " JavaScript responses to analyze");
+
+            if (jsResponses.isEmpty()) {
+                SwingUtilities.invokeLater(() -> {
+                    clearBusyState();
+                    showStatusMessage("No JavaScript responses found in sitemap", Color.ORANGE);
+                });
+                return;
+            }
+
+            // Process JavaScript responses to extract descriptors
+            int totalResponses = jsResponses.size();
+            int processedResponses = 0;
+
+            for (HttpRequestResponse jsResponse : jsResponses) {
+                // Check for cancellation
+                if (descriptorsCancelled || operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("Descriptors parsing cancelled by user");
+                    SwingUtilities.invokeLater(() -> {
+                        clearBusyState();
+                        if (!discoveredDescriptors.isEmpty()) {
+                            showStatusMessage("Operation cancelled - " + discoveredDescriptors.size() + " descriptors found so far", Color.ORANGE);
+                            // Create tab with whatever data was collected
+                            if (resultTabCallback != null && currentDescriptorResults != null) {
+                                resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                            }
+                        } else {
+                            showStatusMessage("Operation cancelled", Color.RED);
+                        }
+                    });
+                    return;
+                }
+
+                processedResponses++;
+                final int currentProgress = (processedResponses * 100) / totalResponses;
+
+                SwingUtilities.invokeLater(() -> {
+                    findDescriptorsFromSitemapBtn.setText("⟳ Descriptors (" + currentProgress + "%)");
+                });
+
+                try {
+                    processJavaScriptResponseForDescriptors(jsResponse);
+                } catch (Exception e) {
+                    api.logging().logToError("Error processing JavaScript response for descriptors: " + e.getMessage());
+                }
+            }
+
+            api.logging().logToOutput("Completed descriptors parsing. Found " + discoveredDescriptors.size() + " unique descriptors");
+
+            // Finalize results
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                if (!discoveredDescriptors.isEmpty()) {
+                    showStatusMessage("✓ Descriptors parsing completed - " + discoveredDescriptors.size() + " descriptors found", Color.GREEN);
+                    if (resultTabCallback != null && currentDescriptorResults != null) {
+                        resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                    }
+                } else {
+                    showStatusMessage("Descriptors parsing completed - no descriptors found", Color.ORANGE);
+                }
+            });
+
+        } catch (Exception e) {
+            api.logging().logToError("Exception in parseSitemapDescriptors: " + e.getMessage());
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showStatusMessage("Error during descriptors parsing: " + e.getMessage(), Color.RED);
+            });
+        }
+    }
+
+    /**
+     * Process a JavaScript response to extract Apex descriptors and their parameters
+     */
+    private void processJavaScriptResponseForDescriptors(HttpRequestResponse jsResponse) {
+        if (jsResponse == null || jsResponse.response() == null) {
+            return;
+        }
+
+        try {
+            String responseBody = jsResponse.response().bodyToString();
+            String sourceUrl = jsResponse.request().url();
+
+            // Use the context pattern to find descriptors with their parameter definitions
+            Matcher contextMatcher = DESCRIPTOR_CONTEXT_PATTERN.matcher(responseBody);
+            while (contextMatcher.find()) {
+                String descriptor = contextMatcher.group(1);
+                String parameterArrayJson = contextMatcher.group(2);
+
+                if (descriptor != null && discoveredDescriptors.add(descriptor)) {
+                    // Parse parameters if available
+                    java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+                    if (parameterArrayJson != null && !parameterArrayJson.trim().isEmpty()) {
+                        parameters = parseParametersFromJson(parameterArrayJson);
+                    }
+
+                    // Create descriptor info
+                    DescriptorInfo descriptorInfo = new DescriptorInfo(descriptor, parameters, sourceUrl);
+                    addDescriptorToResults(descriptorInfo);
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Exception processing JavaScript response for descriptors: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Parse parameter definitions from JSON parameter array
+     */
+    private java.util.List<DescriptorInfo.ParameterInfo> parseParametersFromJson(String parameterArrayJson) {
+        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+
+        try {
+            // Extract individual parameter objects using regex
+            Matcher paramMatcher = PARAMETER_PATTERN.matcher(parameterArrayJson);
+            while (paramMatcher.find()) {
+                String name = paramMatcher.group(1);
+                String type = paramMatcher.group(2);
+
+                if (name != null && type != null) {
+                    parameters.add(new DescriptorInfo.ParameterInfo(name, type));
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error parsing parameter definitions: " + e.getMessage());
+        }
+
+        return parameters;
+    }
+
+    /**
+     * Generate sample JSON value based on Apex type
+     */
+    private String generateSampleValue(String apexType) {
+        if (apexType == null) {
+            return "\"sample\"";
+        }
+
+        String lowerType = apexType.toLowerCase();
+
+        if (lowerType.contains("string")) {
+            return "\"sample\"";
+        } else if (lowerType.contains("integer") || lowerType.contains("int")) {
+            return "123";
+        } else if (lowerType.contains("boolean") || lowerType.contains("bool")) {
+            return "true";
+        } else if (lowerType.contains("decimal") || lowerType.contains("double") || lowerType.contains("float")) {
+            return "123.45";
+        } else if (lowerType.contains("date")) {
+            return "\"2024-01-01\"";
+        } else if (lowerType.contains("list") || lowerType.contains("array")) {
+            return "[\"sample\"]";
+        } else {
+            // Default to string for unknown types
+            return "\"sample\"";
+        }
+    }
+
+    /**
+     * Generate sample message JSON for the descriptor
+     */
+    private String generateSampleMessage(DescriptorInfo descriptorInfo) {
+        try {
+            StringBuilder paramsBuilder = new StringBuilder();
+            paramsBuilder.append("{");
+
+            boolean first = true;
+            for (DescriptorInfo.ParameterInfo param : descriptorInfo.getParameters()) {
+                if (!first) {
+                    paramsBuilder.append(",");
+                }
+                paramsBuilder.append("\"").append(param.getName()).append("\":");
+                paramsBuilder.append(generateSampleValue(param.getType()));
+                first = false;
+            }
+
+            paramsBuilder.append("}");
+
+            // Create the complete sample message
+            String sampleMessage = String.format(
+                "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"%s\",\"callingDescriptor\":\"UNKNOWN\",\"params\":%s}]}",
+                descriptorInfo.getDescriptor(),
+                paramsBuilder.toString()
+            );
+
+            return sampleMessage;
+        } catch (Exception e) {
+            api.logging().logToError("Error generating sample message: " + e.getMessage());
+            return "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"" + descriptorInfo.getDescriptor() + "\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{}}]}";
+        }
+    }
+
+    /**
+     * Add discovered descriptor to results with formatted display
+     */
+    private void addDescriptorToResults(DescriptorInfo descriptorInfo) {
+        if (descriptorInfo == null || currentDescriptorResults == null) {
+            return;
+        }
+
+        // Format parameters for display
+        StringBuilder paramsDisplay = new StringBuilder();
+        if (descriptorInfo.getParameters().isEmpty()) {
+            paramsDisplay.append("    No parameters");
+        } else {
+            for (DescriptorInfo.ParameterInfo param : descriptorInfo.getParameters()) {
+                paramsDisplay.append("    {\"name\":\"").append(param.getName())
+                           .append("\",\"type\":\"").append(param.getType()).append("\"}\n");
+            }
+        }
+
+        // Generate sample message
+        String sampleMessage = generateSampleMessage(descriptorInfo);
+
+        // Format the complete entry for display
+        String displayEntry = String.format(
+            "Descriptor:\n%s\n\nParameters:\n%s\nSample Message:\n    %s\n\nSource:\n    %s",
+            descriptorInfo.getDescriptor(),
+            paramsDisplay.toString(),
+            sampleMessage,
+            descriptorInfo.getSourceUrl()
+        );
+
+        // Add to results
+        java.util.List<String> existingEntries = currentDescriptorResults.getRoutesForCategory("Apex Descriptors");
+        if (existingEntries == null) {
+            existingEntries = new java.util.ArrayList<>();
+        } else {
+            existingEntries = new java.util.ArrayList<>(existingEntries); // Create mutable copy
+        }
+
+        existingEntries.add(displayEntry);
+        currentDescriptorResults.addRouteCategory("Apex Descriptors", existingEntries);
+
+        api.logging().logToOutput("Found Apex descriptor: " + descriptorInfo.getDescriptor() + " with " + descriptorInfo.getParameters().size() + " parameters");
     }
 
     /**
@@ -2641,6 +3013,7 @@ public class ActionsTab {
         getNavItemsBtn.addActionListener(e -> executeAction("GetNavItems"));
         getRouterInitializerPathsBtn.addActionListener(e -> executeAction("GetRouterInitializerPaths"));
         getPotentialPathsFromJSBtn.addActionListener(e -> executeAction("GetPotentialPathsFromJS"));
+        findDescriptorsFromSitemapBtn.addActionListener(e -> executeAction("FindDescriptorsFromSitemap"));
 
         // Record ID field handler - enable/disable button based on text content
         recordIdField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -2722,7 +3095,8 @@ public class ActionsTab {
 
         // Check if this is a passive operation that doesn't require a baseline request
         boolean isPassiveOperation = "GetRouterInitializerPaths".equals(actionType) ||
-                                   "GetPotentialPathsFromJS".equals(actionType);
+                                   "GetPotentialPathsFromJS".equals(actionType) ||
+                                   "FindDescriptorsFromSitemap".equals(actionType);
 
         if (selectedItem == null && !isPassiveOperation) {
             return;
@@ -3030,6 +3404,30 @@ public class ActionsTab {
                     }
                 }, "PotentialPathsFromJS-" + jsPathsResultId).start();
                 break;
+            case "FindDescriptorsFromSitemap":
+                setBusyState(findDescriptorsFromSitemapBtn, "Sitemap Descriptors Parsing");
+
+                // Generate result ID for sitemap descriptors parsing
+                String descriptorsResultId = generateRouteDiscoveryResultId();
+
+                api.logging().logToOutput("Starting passive sitemap descriptors parsing...");
+
+                // Check sitemap only checkbox state
+                boolean sitemapOnlyDescriptors = searchSitemapOnlyCheckbox.isSelected();
+
+                // Perform passive sitemap descriptors parsing in background thread
+                ThreadManager.createManagedThread(() -> {
+                    try {
+                        parseSitemapDescriptors(selectedRequest, descriptorsResultId, sitemapOnlyDescriptors);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during sitemap descriptors parsing: " + e.getMessage());
+                            api.logging().logToError("Sitemap descriptors parsing failed: " + e.getMessage());
+                        });
+                    }
+                }, "DescriptorsFromSitemap-" + descriptorsResultId).start();
+                break;
         }
     }
     
@@ -3078,6 +3476,7 @@ public class ActionsTab {
         // Passive route discovery buttons (sitemap parsing) don't require baseline requests
         getRouterInitializerPathsBtn.setEnabled(true);
         getPotentialPathsFromJSBtn.setEnabled(true);
+        findDescriptorsFromSitemapBtn.setEnabled(true);
 
         // Get Record by ID depends on both having requests and non-empty record ID
         updateRecordByIdButtonState();
