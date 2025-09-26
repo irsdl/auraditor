@@ -895,7 +895,23 @@ public class ActionsTab {
             return "Discovered Routes " + routeDiscoveryResultCounter;
         }
     }
-    
+
+    /**
+     * Check if existing tabs should be reused instead of creating new ones
+     */
+    private boolean shouldReuseTab() {
+        return !alwaysCreateNewTabCheckbox.isSelected() && routeDiscoveryResultCounter > 0;
+    }
+
+    /**
+     * Generate timestamp string for category names
+     */
+    private String generateTimestamp() {
+        return java.time.LocalDateTime.now().format(
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        );
+    }
+
     /**
      * Generate result ID for object by name operations
      */
@@ -1314,8 +1330,9 @@ public class ActionsTab {
 
             // Initialize results
             currentJSPathsResults = new RouteDiscoveryResult();
-            String timestamp = java.time.LocalDateTime.now().format(
-                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+            // Generate timestamp for this parsing session
+            String sessionTimestamp = generateTimestamp();
 
             // Get sitemap items
             api.logging().logToOutput("Retrieving sitemap entries...");
@@ -1378,9 +1395,13 @@ public class ActionsTab {
                         clearBusyState();
                         if (!discoveredJSPaths.isEmpty()) {
                             showStatusMessage("Operation cancelled - " + discoveredJSPaths.size() + " JS paths found so far", Color.ORANGE);
-                            // Create tab with whatever data was collected
+                            // Create or update tab with whatever data was collected
                             if (resultTabCallback != null && currentJSPathsResults != null) {
-                                resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                                if (shouldReuseTab()) {
+                                    resultTabCallback.updateDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                                } else {
+                                    resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                                }
                             }
                         } else {
                             showStatusMessage("Operation cancelled", Color.RED);
@@ -1397,7 +1418,7 @@ public class ActionsTab {
                 });
 
                 try {
-                    processJavaScriptResponseForPaths(jsResponse, baseRequest);
+                    processJavaScriptResponseForPaths(jsResponse, baseRequest, sessionTimestamp);
                 } catch (Exception e) {
                     api.logging().logToError("Error processing JavaScript response for paths: " + e.getMessage());
                 }
@@ -1411,7 +1432,11 @@ public class ActionsTab {
                 if (!discoveredJSPaths.isEmpty()) {
                     showStatusMessage("✓ JS Paths parsing completed - " + discoveredJSPaths.size() + " paths found", Color.GREEN);
                     if (resultTabCallback != null && currentJSPathsResults != null) {
-                        resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                        if (shouldReuseTab()) {
+                            resultTabCallback.updateDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                        } else {
+                            resultTabCallback.createDiscoveredRoutesTab(resultId, currentJSPathsResults);
+                        }
                     }
                 } else {
                     showStatusMessage("JS Paths parsing completed - no paths found", Color.ORANGE);
@@ -1442,7 +1467,7 @@ public class ActionsTab {
 
             // Initialize results
             currentDescriptorResults = new RouteDiscoveryResult();
-            String timestamp = java.time.LocalDateTime.now().format(
+            final String sessionTimestamp = java.time.LocalDateTime.now().format(
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
             // Get sitemap items
@@ -1506,9 +1531,13 @@ public class ActionsTab {
                         clearBusyState();
                         if (!discoveredDescriptors.isEmpty()) {
                             showStatusMessage("Operation cancelled - " + discoveredDescriptors.size() + " descriptors found so far", Color.ORANGE);
-                            // Create tab with whatever data was collected
+                            // Create or update tab with whatever data was collected
                             if (resultTabCallback != null && currentDescriptorResults != null) {
-                                resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                                if (shouldReuseTab()) {
+                                    resultTabCallback.updateDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                                } else {
+                                    resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                                }
                             }
                         } else {
                             showStatusMessage("Operation cancelled", Color.RED);
@@ -1525,7 +1554,7 @@ public class ActionsTab {
                 });
 
                 try {
-                    processJavaScriptResponseForDescriptors(jsResponse);
+                    processJavaScriptResponseForDescriptors(jsResponse, sessionTimestamp);
                 } catch (Exception e) {
                     api.logging().logToError("Error processing JavaScript response for descriptors: " + e.getMessage());
                 }
@@ -1539,7 +1568,11 @@ public class ActionsTab {
                 if (!discoveredDescriptors.isEmpty()) {
                     showStatusMessage("✓ Descriptors parsing completed - " + discoveredDescriptors.size() + " descriptors found", Color.GREEN);
                     if (resultTabCallback != null && currentDescriptorResults != null) {
-                        resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                        if (shouldReuseTab()) {
+                            resultTabCallback.updateDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                        } else {
+                            resultTabCallback.createDiscoveredRoutesTab(resultId, currentDescriptorResults);
+                        }
                     }
                 } else {
                     showStatusMessage("Descriptors parsing completed - no descriptors found", Color.ORANGE);
@@ -1558,7 +1591,7 @@ public class ActionsTab {
     /**
      * Process a JavaScript response to extract Apex descriptors and their parameters
      */
-    private void processJavaScriptResponseForDescriptors(HttpRequestResponse jsResponse) {
+    private void processJavaScriptResponseForDescriptors(HttpRequestResponse jsResponse, String sessionTimestamp) {
         if (jsResponse == null || jsResponse.response() == null) {
             return;
         }
@@ -1582,7 +1615,7 @@ public class ActionsTab {
 
                     // Create descriptor info
                     DescriptorInfo descriptorInfo = new DescriptorInfo(descriptor, parameters, sourceUrl);
-                    addDescriptorToResults(descriptorInfo);
+                    addDescriptorToResults(descriptorInfo, sessionTimestamp);
                 }
             }
 
@@ -1680,7 +1713,7 @@ public class ActionsTab {
     /**
      * Add discovered descriptor to results with formatted display
      */
-    private void addDescriptorToResults(DescriptorInfo descriptorInfo) {
+    private void addDescriptorToResults(DescriptorInfo descriptorInfo, String sessionTimestamp) {
         if (descriptorInfo == null || currentDescriptorResults == null) {
             return;
         }
@@ -1712,8 +1745,9 @@ public class ActionsTab {
             sampleMessage
         );
 
-        // Add to results
-        java.util.List<String> existingEntries = currentDescriptorResults.getRoutesForCategory("Apex Descriptors");
+        // Add to results with timestamped category
+        String categoryName = "Apex Descriptors (" + sessionTimestamp + ")";
+        java.util.List<String> existingEntries = currentDescriptorResults.getRoutesForCategory(categoryName);
         if (existingEntries == null) {
             existingEntries = new java.util.ArrayList<>();
         } else {
@@ -1721,7 +1755,7 @@ public class ActionsTab {
         }
 
         existingEntries.add(displayEntry);
-        currentDescriptorResults.addRouteCategory("Apex Descriptors", existingEntries);
+        currentDescriptorResults.addRouteCategory(categoryName, existingEntries);
 
         api.logging().logToOutput("Found Apex descriptor: " + descriptorInfo.getDescriptor() + " with " + descriptorInfo.getParameters().size() + " parameters");
     }
@@ -1729,7 +1763,7 @@ public class ActionsTab {
     /**
      * Process a JavaScript response to extract meaningful paths
      */
-    private void processJavaScriptResponseForPaths(HttpRequestResponse jsResponse, BaseRequest baseRequest) {
+    private void processJavaScriptResponseForPaths(HttpRequestResponse jsResponse, BaseRequest baseRequest, String sessionTimestamp) {
         if (jsResponse == null || jsResponse.response() == null) {
             return;
         }
@@ -1752,7 +1786,7 @@ public class ActionsTab {
             while (relativeMatcher.find()) {
                 String path = relativeMatcher.group(1);
                 if (isValidJSPath(path)) {
-                    addJSPathToResults(path, "Relative Path", jsResponse);
+                    addJSPathToResults(path, "Relative Path", jsResponse, sessionTimestamp);
                 }
             }
 
@@ -1761,7 +1795,7 @@ public class ActionsTab {
             while (paramMatcher.find()) {
                 String path = paramMatcher.group(1);
                 if (isValidJSPath(path)) {
-                    addJSPathToResults(path, "Parameterized Path", jsResponse);
+                    addJSPathToResults(path, "Parameterized Path", jsResponse, sessionTimestamp);
                 }
             }
 
@@ -1776,7 +1810,7 @@ public class ActionsTab {
                         java.net.URI fullUri = new java.net.URI(fullUrl);
                         // Only include URLs from the same domain
                         if (baseDomain.equalsIgnoreCase(fullUri.getHost()) && urlPath != null && isValidJSPath(urlPath)) {
-                            addJSPathToResults(urlPath, "Same-Domain Path", jsResponse);
+                            addJSPathToResults(urlPath, "Same-Domain Path", jsResponse, sessionTimestamp);
                         }
                     } catch (Exception e) {
                         // Skip malformed URLs
@@ -1847,7 +1881,7 @@ public class ActionsTab {
     /**
      * Add a discovered JS path to the results, handling duplicates
      */
-    private void addJSPathToResults(String path, String pathType, HttpRequestResponse sourceResponse) {
+    private void addJSPathToResults(String path, String pathType, HttpRequestResponse sourceResponse, String sessionTimestamp) {
         if (path == null || discoveredJSPaths.contains(path)) {
             return; // Skip duplicates
         }
@@ -1855,10 +1889,12 @@ public class ActionsTab {
         // Add to discovered set
         discoveredJSPaths.add(path);
 
-        // Add to results by category
+        // Add to results by category - use timestamped category name for all paths
         if (currentJSPathsResults != null) {
-            // Get existing routes for this path type, or create new list
-            java.util.List<String> existingRoutes = currentJSPathsResults.getRoutesForCategory(pathType);
+            String categoryName = "Potential Paths (" + sessionTimestamp + ")";
+
+            // Get existing routes for this category, or create new list
+            java.util.List<String> existingRoutes = currentJSPathsResults.getRoutesForCategory(categoryName);
             if (existingRoutes == null) {
                 existingRoutes = new java.util.ArrayList<>();
             } else {
@@ -1869,7 +1905,7 @@ public class ActionsTab {
             existingRoutes.add(path);
 
             // Update the category
-            currentJSPathsResults.addRouteCategory(pathType, existingRoutes);
+            currentJSPathsResults.addRouteCategory(categoryName, existingRoutes);
 
             api.logging().logToOutput("Found JS path: " + path + " (" + pathType + ")");
         }
