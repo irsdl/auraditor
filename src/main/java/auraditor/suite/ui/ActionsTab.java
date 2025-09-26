@@ -872,6 +872,29 @@ public class ActionsTab {
         routeDiscoveryResultCounter++;
         return "Discovered Routes " + routeDiscoveryResultCounter;
     }
+
+    /**
+     * Generate result ID for route discovery operations with tab reuse check
+     */
+    private String generateRouteDiscoveryResultIdWithReuseCheck() {
+        // If user prefers to always create new tabs, always create new
+        if (alwaysCreateNewTabCheckbox.isSelected()) {
+            routeDiscoveryResultCounter++;
+            return "Discovered Routes " + routeDiscoveryResultCounter;
+        }
+
+        // Check if we have existing route discovery tabs to reuse
+        boolean hasExistingTabs = routeDiscoveryResultCounter > 0;
+
+        if (!hasExistingTabs) {
+            // No existing tabs, create first one
+            routeDiscoveryResultCounter++;
+            return "Discovered Routes " + routeDiscoveryResultCounter;
+        } else {
+            // Reuse the most recent tab
+            return "Discovered Routes " + routeDiscoveryResultCounter;
+        }
+    }
     
     /**
      * Generate result ID for object by name operations
@@ -1663,26 +1686,30 @@ public class ActionsTab {
         }
 
         // Format parameters for display
-        StringBuilder paramsDisplay = new StringBuilder();
+        String paramsDisplay;
         if (descriptorInfo.getParameters().isEmpty()) {
-            paramsDisplay.append("    No parameters");
+            paramsDisplay = "No parameters";
         } else {
+            StringBuilder paramsBuilder = new StringBuilder();
             for (DescriptorInfo.ParameterInfo param : descriptorInfo.getParameters()) {
-                paramsDisplay.append("    {\"name\":\"").append(param.getName())
-                           .append("\",\"type\":\"").append(param.getType()).append("\"}\n");
+                if (paramsBuilder.length() > 0) {
+                    paramsBuilder.append("\n");
+                }
+                paramsBuilder.append("{\"name\":\"").append(param.getName())
+                           .append("\",\"type\":\"").append(param.getType()).append("\"}");
             }
+            paramsDisplay = paramsBuilder.toString();
         }
 
         // Generate sample message
         String sampleMessage = generateSampleMessage(descriptorInfo);
 
-        // Format the complete entry for display
+        // Format the complete entry for display (without Source section)
         String displayEntry = String.format(
-            "Descriptor:\n%s\n\nParameters:\n%s\nSample Message:\n    %s\n\nSource:\n    %s",
+            "Descriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
             descriptorInfo.getDescriptor(),
-            paramsDisplay.toString(),
-            sampleMessage,
-            descriptorInfo.getSourceUrl()
+            paramsDisplay,
+            sampleMessage
         );
 
         // Add to results
@@ -1803,6 +1830,17 @@ public class ActionsTab {
             return false;
         }
 
+        // Exclude common asset file extensions (images, fonts, stylesheets, maps)
+        String lowerPath = path.toLowerCase();
+        String[] excludedExtensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
+            ".ico", ".woff", ".woff2", ".ttf", ".eot", ".css", ".map", ".pdf", ".webp",
+            ".avif", ".tiff", ".tif", ".webm", ".mp4", ".avi", ".mov", ".wmv"};
+        for (String ext : excludedExtensions) {
+            if (lowerPath.endsWith(ext)) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -1827,9 +1865,8 @@ public class ActionsTab {
                 existingRoutes = new java.util.ArrayList<>(existingRoutes); // Create mutable copy
             }
 
-            // Add the new path with source info
-            String pathWithSource = path + " (from: " + sourceResponse.request().url() + ")";
-            existingRoutes.add(pathWithSource);
+            // Add the new path (clean, without source info)
+            existingRoutes.add(path);
 
             // Update the category
             currentJSPathsResults.addRouteCategory(pathType, existingRoutes);
@@ -3359,8 +3396,8 @@ public class ActionsTab {
             case "GetRouterInitializerPaths":
                 setBusyState(getRouterInitializerPathsBtn, "Sitemap Router Paths Parsing");
 
-                // Generate result ID for sitemap router paths parsing
-                String routerInitResultId = generateRouteDiscoveryResultId();
+                // Generate result ID for sitemap router paths parsing with tab reuse check
+                String routerInitResultId = generateRouteDiscoveryResultIdWithReuseCheck();
 
                 api.logging().logToOutput("Starting passive sitemap router paths parsing...");
 
@@ -3383,8 +3420,8 @@ public class ActionsTab {
             case "GetPotentialPathsFromJS":
                 setBusyState(getPotentialPathsFromJSBtn, "Sitemap JS Paths Parsing");
 
-                // Generate result ID for sitemap JS paths parsing
-                String jsPathsResultId = generateRouteDiscoveryResultId();
+                // Generate result ID for sitemap JS paths parsing with tab reuse check
+                String jsPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
 
                 api.logging().logToOutput("Starting passive sitemap JS paths parsing...");
 
@@ -3407,8 +3444,8 @@ public class ActionsTab {
             case "FindDescriptorsFromSitemap":
                 setBusyState(findDescriptorsFromSitemapBtn, "Sitemap Descriptors Parsing");
 
-                // Generate result ID for sitemap descriptors parsing
-                String descriptorsResultId = generateRouteDiscoveryResultId();
+                // Generate result ID for sitemap descriptors parsing with tab reuse check
+                String descriptorsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
 
                 api.logging().logToOutput("Starting passive sitemap descriptors parsing...");
 
@@ -3485,10 +3522,12 @@ public class ActionsTab {
         objectNameField.setEnabled(hasRequests);
         recordIdField.setEnabled(hasRequests);
         requestSelector.setEnabled(hasRequests);
-        threadCountSpinner.setEnabled(hasRequests);
         usePresetWordlistCheckbox.setEnabled(hasRequests);
         selectWordlistBtn.setEnabled(hasRequests && !usePresetWordlistCheckbox.isSelected());
-        alwaysCreateNewTabCheckbox.setEnabled(hasRequests);
+
+        // These controls should be enabled regardless of baseline request availability
+        threadCountSpinner.setEnabled(true);
+        alwaysCreateNewTabCheckbox.setEnabled(true);
 
         // Discovery result selector depends on having discovery results
         discoveryResultSelector.setEnabled(hasRequests && hasDiscoveryResults);
