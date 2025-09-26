@@ -1718,6 +1718,28 @@ public class ActionsTab {
             return;
         }
 
+        // === Category 1: Simple List - Just descriptor names ===
+        String listCategoryName = "Apex Descriptors List (" + sessionTimestamp + ")";
+        java.util.List<String> listEntries = currentDescriptorResults.getRoutesForCategory(listCategoryName);
+        if (listEntries == null) {
+            listEntries = new java.util.ArrayList<>();
+        } else {
+            listEntries = new java.util.ArrayList<>(listEntries); // Create mutable copy
+        }
+
+        // Add just the descriptor name to the simple list
+        listEntries.add(descriptorInfo.getDescriptor());
+        currentDescriptorResults.addRouteCategory(listCategoryName, listEntries);
+
+        // === Category 2: Detailed Information with separators ===
+        String detailsCategoryName = "Apex Descriptors Details (" + sessionTimestamp + ")";
+        java.util.List<String> detailEntries = currentDescriptorResults.getRoutesForCategory(detailsCategoryName);
+        if (detailEntries == null) {
+            detailEntries = new java.util.ArrayList<>();
+        } else {
+            detailEntries = new java.util.ArrayList<>(detailEntries); // Create mutable copy
+        }
+
         // Format parameters for display
         String paramsDisplay;
         if (descriptorInfo.getParameters().isEmpty()) {
@@ -1737,25 +1759,32 @@ public class ActionsTab {
         // Generate sample message
         String sampleMessage = generateSampleMessage(descriptorInfo);
 
-        // Format the complete entry for display (without Source section)
-        String displayEntry = String.format(
-            "Descriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
-            descriptorInfo.getDescriptor(),
-            paramsDisplay,
-            sampleMessage
-        );
+        // Create separator for visual distinction between entries
+        String separator = "================================================================================";
 
-        // Add to results with timestamped category
-        String categoryName = "Apex Descriptors (" + sessionTimestamp + ")";
-        java.util.List<String> existingEntries = currentDescriptorResults.getRoutesForCategory(categoryName);
-        if (existingEntries == null) {
-            existingEntries = new java.util.ArrayList<>();
+        // Format the complete detailed entry with separator
+        String detailEntry;
+        if (detailEntries.isEmpty()) {
+            // First entry - no leading separator
+            detailEntry = String.format(
+                "Descriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
+                descriptorInfo.getDescriptor(),
+                paramsDisplay,
+                sampleMessage
+            );
         } else {
-            existingEntries = new java.util.ArrayList<>(existingEntries); // Create mutable copy
+            // Subsequent entries - add separator before
+            detailEntry = String.format(
+                "%s\n\nDescriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
+                separator,
+                descriptorInfo.getDescriptor(),
+                paramsDisplay,
+                sampleMessage
+            );
         }
 
-        existingEntries.add(displayEntry);
-        currentDescriptorResults.addRouteCategory(categoryName, existingEntries);
+        detailEntries.add(detailEntry);
+        currentDescriptorResults.addRouteCategory(detailsCategoryName, detailEntries);
 
         api.logging().logToOutput("Found Apex descriptor: " + descriptorInfo.getDescriptor() + " with " + descriptorInfo.getParameters().size() + " parameters");
     }
