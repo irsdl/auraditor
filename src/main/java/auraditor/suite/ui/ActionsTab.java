@@ -216,6 +216,10 @@ public class ActionsTab {
         public void addObjectEntry(String objectName, String jsonData) {
             objectEntries.put(objectName, jsonData);
         }
+
+        public void removeObject(String objectName) {
+            objectEntries.remove(objectName);
+        }
     }
 
     /**
@@ -298,6 +302,10 @@ public class ActionsTab {
 
         public void addRouteCategory(String categoryName, java.util.List<String> routes) {
             routeEntries.put(categoryName, new java.util.ArrayList<>(routes));
+        }
+
+        public void removeCategory(String categoryName) {
+            routeEntries.remove(categoryName);
         }
     }
 
@@ -3848,6 +3856,233 @@ public class ActionsTab {
             return filename.replaceAll("[<>:\"/\\|?*()]", "_").replaceAll("\\s+", "_");
         }
 
+        // ===== ENHANCED CONTEXT MENU UTILITIES =====
+
+        /**
+         * Copy text to system clipboard
+         */
+        protected void copyToClipboard(String text) {
+            if (text == null || text.isEmpty()) {
+                return;
+            }
+            try {
+                java.awt.datatransfer.StringSelection stringSelection = new java.awt.datatransfer.StringSelection(text);
+                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
+            } catch (Exception e) {
+                // Can't access api from static context, use System.err as fallback
+                System.err.println("Failed to copy to clipboard: " + e.getMessage());
+            }
+        }
+
+        /**
+         * Get the line of text at a specific point in a JTextArea
+         */
+        protected String getLineAtPoint(JTextArea textArea, java.awt.Point point) {
+            try {
+                int position = textArea.viewToModel2D(point);
+                int lineStart = textArea.getLineStartOffset(textArea.getLineOfOffset(position));
+                int lineEnd = textArea.getLineEndOffset(textArea.getLineOfOffset(position));
+                String lineText = textArea.getText(lineStart, lineEnd - lineStart);
+                return lineText.replaceAll("\\r?\\n$", ""); // Remove trailing newline
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        /**
+         * Extract quoted text at cursor position (text between " or ')
+         */
+        protected String getQuotedTextAtPoint(JTextArea textArea, java.awt.Point point) {
+            try {
+                int position = textArea.viewToModel2D(point);
+                String text = textArea.getText();
+
+                // Find the closest quote before and after the cursor
+                int beforeQuote = -1;
+                int afterQuote = -1;
+                char quoteChar = '"';
+
+                // Search backwards for opening quote
+                for (int i = position - 1; i >= 0; i--) {
+                    char c = text.charAt(i);
+                    if (c == '"' || c == '\'') {
+                        beforeQuote = i;
+                        quoteChar = c;
+                        break;
+                    }
+                }
+
+                // Search forwards for closing quote (same type)
+                if (beforeQuote != -1) {
+                    for (int i = position; i < text.length(); i++) {
+                        if (text.charAt(i) == quoteChar) {
+                            afterQuote = i;
+                            break;
+                        }
+                    }
+                }
+
+                // Extract text between quotes
+                if (beforeQuote != -1 && afterQuote != -1 && afterQuote > beforeQuote + 1) {
+                    return text.substring(beforeQuote + 1, afterQuote);
+                }
+
+                return null;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        /**
+         * Extract word at cursor position using regex [a-zA-Z0-9\.\-_]+
+         */
+        protected String getWordAtPoint(JTextArea textArea, java.awt.Point point) {
+            try {
+                int position = textArea.viewToModel2D(point);
+                String text = textArea.getText();
+
+                // Find word boundaries around cursor position
+                int wordStart = position;
+                int wordEnd = position;
+
+                // Search backwards for word start
+                while (wordStart > 0) {
+                    char c = text.charAt(wordStart - 1);
+                    if (!Character.isLetterOrDigit(c) && c != '.' && c != '-' && c != '_') {
+                        break;
+                    }
+                    wordStart--;
+                }
+
+                // Search forwards for word end
+                while (wordEnd < text.length()) {
+                    char c = text.charAt(wordEnd);
+                    if (!Character.isLetterOrDigit(c) && c != '.' && c != '-' && c != '_') {
+                        break;
+                    }
+                    wordEnd++;
+                }
+
+                if (wordEnd > wordStart) {
+                    String word = text.substring(wordStart, wordEnd);
+                    return word.trim().isEmpty() ? null : word;
+                }
+
+                return null;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        /**
+         * Get preview text for menu items (first N characters)
+         */
+        protected String getPreviewText(String text, int maxLength) {
+            if (text == null || text.isEmpty()) {
+                return "";
+            }
+            if (text.length() <= maxLength) {
+                return text;
+            }
+            return text.substring(0, maxLength) + "...";
+        }
+
+        /**
+         * Create enhanced left panel context menu
+         */
+        protected JPopupMenu createLeftPanelContextMenu(String selectedItem, Runnable deleteAction, Runnable copyAllAction, Runnable exportAction) {
+            JPopupMenu popup = new JPopupMenu();
+
+            // Export item
+            if (exportAction != null) {
+                JMenuItem exportItem = new JMenuItem("Export");
+                exportItem.addActionListener(e -> exportAction.run());
+                popup.add(exportItem);
+            }
+
+            // Delete item
+            if (deleteAction != null && selectedItem != null && !selectedItem.trim().isEmpty()) {
+                JMenuItem deleteItem = new JMenuItem("Delete");
+                deleteItem.addActionListener(e -> deleteAction.run());
+                popup.add(deleteItem);
+            }
+
+            // Copy all to clipboard
+            if (copyAllAction != null) {
+                JMenuItem copyAllItem = new JMenuItem("Copy all to clipboard");
+                copyAllItem.addActionListener(e -> copyAllAction.run());
+                popup.add(copyAllItem);
+            }
+
+            return popup;
+        }
+
+        /**
+         * Create enhanced right panel context menu
+         */
+        protected JPopupMenu createRightPanelContextMenu(JTextArea textArea, java.awt.Point clickPoint, Runnable exportAction) {
+            JPopupMenu popup = new JPopupMenu();
+
+            // Export item
+            if (exportAction != null) {
+                JMenuItem exportItem = new JMenuItem("Export");
+                exportItem.addActionListener(e -> exportAction.run());
+                popup.add(exportItem);
+                popup.addSeparator();
+            }
+
+            // Copy all to clipboard
+            JMenuItem copyAllItem = new JMenuItem("Copy all to clipboard");
+            copyAllItem.addActionListener(e -> copyToClipboard(textArea.getText()));
+            popup.add(copyAllItem);
+
+            // Copy line to clipboard
+            String lineText = getLineAtPoint(textArea, clickPoint);
+            boolean lineNotEmpty = lineText != null && !lineText.trim().isEmpty();
+            JMenuItem copyLineItem = new JMenuItem("Copy line to clipboard");
+            copyLineItem.setEnabled(lineNotEmpty);
+            if (lineNotEmpty) {
+                copyLineItem.addActionListener(e -> copyToClipboard(lineText));
+            }
+            popup.add(copyLineItem);
+
+            // Copy selected text to clipboard
+            String selectedText = textArea.getSelectedText();
+            boolean hasSelection = selectedText != null && !selectedText.isEmpty();
+            JMenuItem copySelectedItem = new JMenuItem("Copy selected text to clipboard");
+            copySelectedItem.setEnabled(hasSelection);
+            if (hasSelection) {
+                copySelectedItem.addActionListener(e -> copyToClipboard(selectedText));
+            }
+            popup.add(copySelectedItem);
+
+            // Copy quoted text to clipboard
+            String quotedText = getQuotedTextAtPoint(textArea, clickPoint);
+            boolean hasQuotedText = quotedText != null && !quotedText.isEmpty();
+            String quotedPreview = hasQuotedText ? getPreviewText(quotedText, 20) : "";
+            JMenuItem copyQuotedItem = new JMenuItem("Copy quoted text to clipboard" +
+                (hasQuotedText ? " (\"" + quotedPreview + "\")" : ""));
+            copyQuotedItem.setEnabled(hasQuotedText);
+            if (hasQuotedText) {
+                copyQuotedItem.addActionListener(e -> copyToClipboard(quotedText));
+            }
+            popup.add(copyQuotedItem);
+
+            // Copy word to clipboard
+            String wordText = getWordAtPoint(textArea, clickPoint);
+            boolean hasWord = wordText != null && !wordText.isEmpty();
+            String wordPreview = hasWord ? getPreviewText(wordText, 20) : "";
+            JMenuItem copyWordItem = new JMenuItem("Copy word to clipboard" +
+                (hasWord ? " (" + wordPreview + ")" : ""));
+            copyWordItem.setEnabled(hasWord);
+            if (hasWord) {
+                copyWordItem.addActionListener(e -> copyToClipboard(wordText));
+            }
+            popup.add(copyWordItem);
+
+            return popup;
+        }
+
         /**
          * Update search results when search text changes
          */
@@ -4466,65 +4701,184 @@ public class ActionsTab {
         }
 
         private void setupContextMenu() {
-            JPopupMenu contextMenu = new JPopupMenu();
+            // Enhanced left panel context menu for category list
+            categoryList.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showLeftPanelContextMenu(e);
+                    }
+                }
 
-            JMenuItem exportItem = new JMenuItem("Export Routes");
-            exportItem.addActionListener(e -> exportRoutes());
-            contextMenu.add(exportItem);
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showLeftPanelContextMenu(e);
+                    }
+                }
+            });
 
-            routeListArea.setComponentPopupMenu(contextMenu);
-            categoryList.setComponentPopupMenu(contextMenu);
+            // Enhanced right panel context menu for route text area
+            routeListArea.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showRightPanelContextMenu(e);
+                    }
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showRightPanelContextMenu(e);
+                    }
+                }
+            });
+        }
+
+        private void showLeftPanelContextMenu(java.awt.event.MouseEvent e) {
+            // Get selected category
+            int index = categoryList.locationToIndex(e.getPoint());
+            String selectedCategory = null;
+            if (index >= 0) {
+                categoryList.setSelectedIndex(index);
+                selectedCategory = categoryList.getSelectedValue();
+            }
+
+            // Create enhanced context menu
+            JPopupMenu popup = createLeftPanelContextMenu(
+                selectedCategory,
+                () -> deleteSelectedCategory(),
+                () -> copyRightPanelToClipboard(),
+                () -> performExport()
+            );
+
+            popup.show(categoryList, e.getX(), e.getY());
+        }
+
+        private void showRightPanelContextMenu(java.awt.event.MouseEvent e) {
+            JPopupMenu popup = createRightPanelContextMenu(
+                routeListArea,
+                e.getPoint(),
+                () -> performExport()
+            );
+
+            popup.show(routeListArea, e.getX(), e.getY());
+        }
+
+        private void deleteSelectedCategory() {
+            String selectedCategory = categoryList.getSelectedValue();
+            if (selectedCategory == null) {
+                return;
+            }
+
+            // Confirm deletion
+            int result = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to delete the category '" + selectedCategory + "'?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (result == JOptionPane.YES_OPTION) {
+                // Remove from route discovery result
+                routeDiscoveryResult.removeCategory(selectedCategory);
+
+                // Update UI
+                applyFilter();
+
+                // Clear right panel if this was the selected category
+                if (selectedCategory.equals(categoryList.getSelectedValue())) {
+                    routeListArea.setText("");
+                }
+            }
+        }
+
+        private void copyRightPanelToClipboard() {
+            String content = routeListArea.getText();
+            if (content != null && !content.trim().isEmpty()) {
+                copyToClipboard(content);
+            }
         }
 
 
         private void exportRoutes() {
-            new Thread(() -> {
-                try {
-                    String filename = "discovered-routes-" +
-                        java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss"));
-                    StringBuilder exportContent = new StringBuilder();
+            // Show file chooser dialog first on EDT
+            SwingUtilities.invokeLater(() -> {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                fileChooser.setDialogTitle("Export Discovered Routes");
 
-                    exportContent.append("Discovered Routes Export\n");
-                    exportContent.append("Exported at: ").append(java.time.LocalDateTime.now()).append("\n\n");
+                String defaultFilename = "discovered-routes-" +
+                    java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss")) + ".txt";
+                fileChooser.setSelectedFile(new java.io.File(defaultFilename));
 
-                    int totalRoutes = routeDiscoveryResult.getTotalCount();
-                    exportContent.append("Total routes: ").append(totalRoutes).append("\n\n");
-
-                    for (String categoryName : routeDiscoveryResult.getCategoryNames()) {
-                        exportContent.append("Category: ").append(categoryName).append("\n");
-                        exportContent.append("=".repeat(categoryName.length() + 10)).append("\n");
-
-                        java.util.List<String> routes = routeDiscoveryResult.getRoutesForCategory(categoryName);
-                        for (String route : routes) {
-                            exportContent.append(route).append("\n");
-                        }
-                        exportContent.append("\n");
-                    }
-
-                    // Write to file
-                    java.nio.file.Path exportPath = java.nio.file.Paths.get(filename + ".txt");
-                    java.nio.file.Files.write(exportPath, exportContent.toString().getBytes());
-
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(
-                            DiscoveredRoutesResultPanel.this,
-                            "Routes exported to: " + exportPath.toAbsolutePath(),
-                            "Export Complete",
-                            JOptionPane.INFORMATION_MESSAGE
-                        );
-                    });
-
-                } catch (Exception ex) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(
-                            DiscoveredRoutesResultPanel.this,
-                            "Failed to export routes: " + ex.getMessage(),
-                            "Export Error",
-                            JOptionPane.ERROR_MESSAGE
-                        );
-                    });
+                int result = fileChooser.showSaveDialog(DiscoveredRoutesResultPanel.this);
+                if (result != JFileChooser.APPROVE_OPTION) {
+                    return; // User cancelled
                 }
-            }).start();
+
+                java.io.File selectedFile = fileChooser.getSelectedFile();
+                if (selectedFile == null) {
+                    return;
+                }
+
+                // Ensure .txt extension
+                if (!selectedFile.getName().toLowerCase().endsWith(".txt")) {
+                    selectedFile = new java.io.File(selectedFile.getAbsolutePath() + ".txt");
+                }
+
+                final java.io.File finalFile = selectedFile;
+
+                // Perform export in background thread
+                new Thread(() -> {
+                    try {
+                        StringBuilder exportContent = new StringBuilder();
+
+                        exportContent.append("Discovered Routes Export\n");
+                        exportContent.append("Exported at: ").append(java.time.LocalDateTime.now()).append("\n\n");
+
+                        int totalRoutes = routeDiscoveryResult.getTotalCount();
+                        exportContent.append("Total routes: ").append(totalRoutes).append("\n\n");
+
+                        for (String categoryName : routeDiscoveryResult.getCategoryNames()) {
+                            exportContent.append("Category: ").append(categoryName).append("\n");
+                            exportContent.append("=".repeat(categoryName.length() + 10)).append("\n");
+
+                            java.util.List<String> routes = routeDiscoveryResult.getRoutesForCategory(categoryName);
+                            for (String route : routes) {
+                                exportContent.append(route).append("\n");
+                            }
+                            exportContent.append("\n");
+                        }
+
+                        // Write to selected file
+                        try (java.io.FileWriter writer = new java.io.FileWriter(finalFile, java.nio.charset.StandardCharsets.UTF_8)) {
+                            writer.write(exportContent.toString());
+                        }
+
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(
+                                DiscoveredRoutesResultPanel.this,
+                                "Routes exported to: " + finalFile.getAbsolutePath(),
+                                "Export Complete",
+                                JOptionPane.INFORMATION_MESSAGE
+                            );
+                        });
+
+                    } catch (Exception ex) {
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(
+                                DiscoveredRoutesResultPanel.this,
+                                "Failed to export routes: " + ex.getMessage(),
+                                "Export Error",
+                                JOptionPane.ERROR_MESSAGE
+                            );
+                        });
+                    }
+                }).start();
+            });
         }
 
         @Override
@@ -4779,32 +5133,27 @@ public class ActionsTab {
         }
 
         /**
-         * Add mouse listener to object list for right-click context menu
+         * Add enhanced mouse listeners for context menus
          */
         private void addMouseListenerToObjectList() {
-            // Remove ALL existing mouse listeners to prevent interference
-            java.awt.event.MouseListener[] existingListeners = objectList.getMouseListeners();
-            for (java.awt.event.MouseListener listener : existingListeners) {
-                objectList.removeMouseListener(listener);
-            }
+            setupEnhancedContextMenus();
+        }
 
-            // Add a single mouse listener that handles popup properly
-            java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
+        private void setupEnhancedContextMenus() {
+            // Enhanced left panel context menu for object list
+            objectList.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override
                 public void mousePressed(java.awt.event.MouseEvent e) {
-                    // Handle selection on any click
                     handleSelection(e);
-                    // Only show popup on popup trigger
                     if (e.isPopupTrigger()) {
-                        showContextMenu(e);
+                        showLeftPanelContextMenu(e);
                     }
                 }
 
                 @Override
                 public void mouseReleased(java.awt.event.MouseEvent e) {
-                    // Only show popup on popup trigger (for Mac compatibility)
                     if (e.isPopupTrigger()) {
-                        showContextMenu(e);
+                        showLeftPanelContextMenu(e);
                     }
                 }
 
@@ -4814,37 +5163,122 @@ public class ActionsTab {
                         objectList.setSelectedIndex(index);
                     }
                 }
+            });
 
-                private void showContextMenu(java.awt.event.MouseEvent e) {
-                    int index = objectList.locationToIndex(e.getPoint());
-
-                    if (index >= 0 && index < objectList.getModel().getSize()) {
-                        // Ensure item is selected (may already be selected from handleSelection)
-                        if (objectList.getSelectedIndex() != index) {
-                            objectList.setSelectedIndex(index);
-                        }
-                        String selectedValue = objectList.getSelectedValue();
-
-                        javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
-
-                        javax.swing.JMenuItem showRequestItem = new javax.swing.JMenuItem("Show HTTP Request");
-                        showRequestItem.addActionListener(action -> showHttpRequest());
-                        popup.add(showRequestItem);
-
-                        javax.swing.JMenuItem sendToRepeaterItem = new javax.swing.JMenuItem("Send to Repeater");
-                        sendToRepeaterItem.addActionListener(action -> sendSelectedToRepeater());
-                        popup.add(sendToRepeaterItem);
-
-                        javax.swing.JMenuItem copyRequestItem = new javax.swing.JMenuItem("Copy HTTP Request");
-                        copyRequestItem.addActionListener(action -> copyHttpRequestToClipboard());
-                        popup.add(copyRequestItem);
-
-                        popup.show(objectList, e.getX(), e.getY());
+            // Enhanced right panel context menu for JSON data area
+            jsonDataArea.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showRightPanelContextMenu(e);
                     }
                 }
-            };
 
-            objectList.addMouseListener(mouseAdapter);
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showRightPanelContextMenu(e);
+                    }
+                }
+            });
+        }
+
+        private void showLeftPanelContextMenu(java.awt.event.MouseEvent e) {
+            // Get selected object
+            int index = objectList.locationToIndex(e.getPoint());
+            String selectedObject = null;
+            if (index >= 0) {
+                objectList.setSelectedIndex(index);
+                selectedObject = objectList.getSelectedValue();
+            }
+
+            // Create enhanced context menu with original functionality preserved
+            JPopupMenu popup = new JPopupMenu();
+
+            // Export
+            JMenuItem exportItem = new JMenuItem("Export");
+            exportItem.addActionListener(action -> performExport());
+            popup.add(exportItem);
+
+            if (selectedObject != null) {
+                popup.addSeparator();
+
+                // Delete
+                JMenuItem deleteItem = new JMenuItem("Delete");
+                deleteItem.addActionListener(action -> deleteSelectedObject());
+                popup.add(deleteItem);
+
+                popup.addSeparator();
+
+                // Original functionality
+                JMenuItem showRequestItem = new JMenuItem("Show HTTP Request");
+                showRequestItem.addActionListener(action -> showHttpRequest());
+                popup.add(showRequestItem);
+
+                JMenuItem sendToRepeaterItem = new JMenuItem("Send to Repeater");
+                sendToRepeaterItem.addActionListener(action -> sendSelectedToRepeater());
+                popup.add(sendToRepeaterItem);
+
+                JMenuItem copyRequestItem = new JMenuItem("Copy HTTP Request");
+                copyRequestItem.addActionListener(action -> copyHttpRequestToClipboard());
+                popup.add(copyRequestItem);
+
+                popup.addSeparator();
+
+                // Copy all to clipboard
+                JMenuItem copyAllItem = new JMenuItem("Copy all to clipboard");
+                copyAllItem.addActionListener(action -> copyRightPanelToClipboard());
+                popup.add(copyAllItem);
+            }
+
+            popup.show(objectList, e.getX(), e.getY());
+        }
+
+        private void showRightPanelContextMenu(java.awt.event.MouseEvent e) {
+            JPopupMenu popup = createRightPanelContextMenu(
+                jsonDataArea,
+                e.getPoint(),
+                () -> performExport()
+            );
+
+            popup.show(jsonDataArea, e.getX(), e.getY());
+        }
+
+        private void deleteSelectedObject() {
+            String selectedObject = objectList.getSelectedValue();
+            if (selectedObject == null) {
+                return;
+            }
+
+            // Confirm deletion
+            int result = JOptionPane.showConfirmDialog(
+                this,
+                "Are you sure you want to delete the object '" + selectedObject + "'?",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (result == JOptionPane.YES_OPTION) {
+                // Remove from object result and current data
+                objectByNameResult.removeObject(selectedObject);
+                currentObjectData.remove(selectedObject);
+
+                // Update UI
+                applyFilter();
+
+                // Clear right panel if this was the selected object
+                if (selectedObject.equals(objectList.getSelectedValue())) {
+                    jsonDataArea.setText("");
+                }
+            }
+        }
+
+        private void copyRightPanelToClipboard() {
+            String content = jsonDataArea.getText();
+            if (content != null && !content.trim().isEmpty()) {
+                copyToClipboard(content);
+            }
         }
         
         private void setupToolbarEventHandlers() {
