@@ -627,11 +627,11 @@ public class ActionsTab {
         recordIdField.setToolTipText("Enter the record ID to retrieve");
         actionsPanel.add(recordIdField, gbc);
 
-        // Route Discovery section
+        // Active Router Discovery section
         gbc.gridx = 0; gbc.gridy++; gbc.gridwidth = 2;
-        JLabel routeLabel = new JLabel("Route Discovery");
-        routeLabel.setFont(routeLabel.getFont().deriveFont(Font.BOLD, 14f));
-        actionsPanel.add(routeLabel, gbc);
+        JLabel activeRouteLabel = new JLabel("Active Router Discovery");
+        activeRouteLabel.setFont(activeRouteLabel.getFont().deriveFont(Font.BOLD, 14f));
+        actionsPanel.add(activeRouteLabel, gbc);
 
         // Active route discovery (sends HTTP request)
         gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
@@ -639,6 +639,12 @@ public class ActionsTab {
         getNavItemsBtn.setToolTipText("Discover navigation items and routes by sending HTTP request");
         getNavItemsBtn.setEnabled(false); // Initially disabled until baseline request is selected
         actionsPanel.add(getNavItemsBtn, gbc);
+
+        // Passive Router Discovery section
+        gbc.gridx = 0; gbc.gridy++; gbc.gridwidth = 2;
+        JLabel passiveRouteLabel = new JLabel("Passive Router Discovery");
+        passiveRouteLabel.setFont(passiveRouteLabel.getFont().deriveFont(Font.BOLD, 14f));
+        actionsPanel.add(passiveRouteLabel, gbc);
 
         // Passive sitemap parsing (no HTTP requests)
         gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
