@@ -1,52 +1,88 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="300" height="80" viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg">
+<svg width="320" height="80" viewBox="0 0 320 80" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Gradient for Lightning bolt -->
-    <linearGradient id="lightningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#FFA500;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#FF6B35;stop-opacity:1" />
+    <!-- Gradient for Cloud parts (light blue) -->
+    <linearGradient id="cloudGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4FC3F7;stop-opacity:1" />
     </linearGradient>
 
-    <!-- Gradient for Shield -->
-    <linearGradient id="shieldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#357ABD;stop-opacity:1" />
-    </linearGradient>
+    <!-- Dark navy background -->
+    <radialGradient id="backgroundGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1419;stop-opacity:1" />
+    </radialGradient>
 
     <!-- Drop shadow filter -->
     <filter id="dropshadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.4"/>
     </filter>
   </defs>
 
-  <!-- Background circle for logo -->
-  <circle cx="40" cy="40" r="35" fill="url(#shieldGradient)" filter="url(#dropshadow)"/>
+  <!-- Dark navy background square -->
+  <rect x="5" y="5" width="70" height="70" rx="6" ry="6" fill="url(#backgroundGradient)" filter="url(#dropshadow)"/>
 
-  <!-- Security shield outline -->
-  <path d="M40 10 L55 18 L55 35 Q55 50 40 65 Q25 50 25 35 L25 18 Z"
-        fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Cloud shape - recreating the PNG design -->
+  <!-- Main cloud body -->
+  <ellipse cx="25" cy="37" rx="8" ry="6" fill="url(#cloudGradient)"/>
+  <ellipse cx="35" cy="35" rx="10" ry="8" fill="url(#cloudGradient)"/>
+  <ellipse cx="45" cy="37" rx="8" ry="6" fill="url(#cloudGradient)"/>
+  <ellipse cx="55" cy="39" rx="7" ry="5" fill="url(#cloudGradient)"/>
 
-  <!-- Lightning bolt (Aura/Lightning symbol) -->
-  <path d="M45 20 L35 35 L42 35 L37 55 L47 40 L40 40 Z"
-        fill="url(#lightningGradient)" stroke="#FFFFFF" stroke-width="1"/>
+  <!-- Cloud connection areas -->
+  <rect x="23" y="33" width="34" height="8" fill="url(#cloudGradient)"/>
+  <rect x="27" y="38" width="26" height="6" fill="url(#cloudGradient)"/>
 
-  <!-- Magnifying glass (audit symbol) -->
-  <circle cx="50" cy="25" r="6" fill="none" stroke="#FFFFFF" stroke-width="2"/>
-  <line x1="54" y1="29" x2="58" y2="33" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"/>
+  <!-- Lightning bolt inside cloud (yellow/white) -->
+  <path d="M42 27 L37 35 L40 35 L36 47 L41 39 L38 39 Z"
+        fill="#FFE082" stroke="#FFFFFF" stroke-width="0.5"/>
+
+  <!-- Keyhole/Security lock in cloud -->
+  <circle cx="47" cy="33" r="2.5" fill="none" stroke="#FFFFFF" stroke-width="1.5"/>
+  <path d="M45.5 35 L48.5 35 L48.5 38 Q48.5 39 47 39 Q45.5 39 45.5 38 Z"
+        fill="none" stroke="#FFFFFF" stroke-width="1"/>
+
+  <!-- Network connection lines and nodes -->
+  <g stroke="#4FC3F7" stroke-width="2" fill="#4FC3F7">
+    <!-- Left connections -->
+    <line x1="23" y1="37" x2="17" y2="39"/>
+    <circle cx="17" cy="39" r="2"/>
+    <line x1="17" y1="39" x2="12" y2="44"/>
+    <circle cx="12" cy="44" r="2"/>
+
+    <!-- Right connections -->
+    <line x1="55" y1="37" x2="61" y2="39"/>
+    <circle cx="61" cy="39" r="2"/>
+    <line x1="61" y1="39" x2="66" y2="44"/>
+    <circle cx="66" cy="44" r="2"/>
+
+    <!-- Bottom connections -->
+    <line x1="30" y1="42" x2="28" y2="50"/>
+    <circle cx="28" cy="50" r="2"/>
+    <line x1="40" y1="43" x2="40" y2="52"/>
+    <circle cx="40" cy="52" r="2"/>
+    <line x1="50" y1="42" x2="52" y2="50"/>
+    <circle cx="52" cy="50" r="2"/>
+
+    <!-- Additional network nodes -->
+    <line x1="28" y1="50" x2="23" y2="55"/>
+    <circle cx="23" cy="55" r="1.5"/>
+    <line x1="52" y1="50" x2="57" y2="55"/>
+    <circle cx="57" cy="55" r="1.5"/>
+  </g>
 
   <!-- Text: "AURADITOR" -->
-  <text x="85" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2C3E50">
+  <text x="90" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2C3E50">
     AURADITOR
   </text>
 
   <!-- Tagline -->
-  <text x="85" y="52" font-family="Arial, sans-serif" font-size="11" fill="#7F8C8D">
+  <text x="90" y="52" font-family="Arial, sans-serif" font-size="11" fill="#7F8C8D">
     Salesforce Aura/Lightning Security Auditor
   </text>
 
-  <!-- Burp Suite Integration indicator -->
-  <text x="85" y="65" font-family="Arial, sans-serif" font-size="9" fill="#95A5A6">
-    Professional Burp Suite Extension
+  <!-- Attribution -->
+  <text x="90" y="65" font-family="Arial, sans-serif" font-size="9" fill="#95A5A6">
+    A Burp Suite Extension by @irsdl &amp; AI
   </text>
 </svg>

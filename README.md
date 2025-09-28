@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo.svg" alt="Auraditor Logo" width="300" height="80">
+  <img src="logo.png" alt="Auraditor Logo" width="80" height="80">
 </div>
 
 # Auraditor
