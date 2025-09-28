@@ -3449,7 +3449,8 @@ public class ActionsTab {
         // Check if this is a passive operation that doesn't require a baseline request
         boolean isPassiveOperation = "GetRouterInitializerPaths".equals(actionType) ||
                                    "GetPotentialPathsFromJS".equals(actionType) ||
-                                   "FindDescriptorsFromSitemap".equals(actionType);
+                                   "FindDescriptorsFromSitemap".equals(actionType) ||
+                                   "PerformAllSitemapSearches".equals(actionType);
 
         if (selectedItem == null && !isPassiveOperation) {
             return;
