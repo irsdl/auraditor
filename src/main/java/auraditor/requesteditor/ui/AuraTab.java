@@ -517,19 +517,34 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
         // Normalize line endings and handle various JSON formatting issues
         processed = processed.replace("\r\n", "\n").replace("\r", "\n");
 
-        // Try to validate and reformat the JSON to ensure it's valid
+        // Proactively minify if JSON contains newlines (common cause of form parsing issues)
+        if (processed.contains("\n")) {
+            api.logging().logToOutput("AuraTab: Detected multiline JSON, attempting proactive minification...");
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(processed);
+
+                // Minify the JSON to prevent form parsing issues
+                processed = mapper.writeValueAsString(node);
+                api.logging().logToOutput("AuraTab: Proactive JSON minification successful");
+            } catch (Exception e) {
+                api.logging().logToOutput("AuraTab: Proactive minification failed, will try manual approach: " + e.getMessage());
+                // Try manual minification as fallback
+                processed = minifyJsonManually(processed);
+            }
+        }
+
+        // Try to validate the final JSON
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(processed);
 
-            // If we successfully parsed it, we can optionally reformat it for consistency
-            // But keep original formatting to preserve user intent
             api.logging().logToOutput("AuraTab: JSON validation successful");
             return processed;
         } catch (Exception e) {
-            api.logging().logToOutput("AuraTab: JSON validation failed, will attempt preprocessing: " + e.getMessage());
+            api.logging().logToOutput("AuraTab: JSON validation failed, will attempt additional cleanup: " + e.getMessage());
 
-            // If JSON parsing failed, try various cleanup approaches
+            // If JSON parsing still failed, try additional cleanup approaches
             return attemptJsonCleanup(processed);
         }
     }
@@ -543,14 +558,35 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
         // Remove any leading/trailing whitespace
         cleaned = cleaned.trim();
 
-        // Handle common issues with single-line JSON in HTTP bodies
+        // Strategy 1: Try to minify the JSON if it contains newlines (common issue with beautified JSON)
+        if (cleaned.contains("\n") || cleaned.contains("\r")) {
+            api.logging().logToOutput("AuraTab: Detected multiline JSON, attempting to minify...");
+            try {
+                // Attempt to parse and minify the JSON
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(cleaned);
+
+                // Write as compact JSON without pretty printing
+                String minified = mapper.writeValueAsString(node);
+                api.logging().logToOutput("AuraTab: JSON minification successful");
+                return minified;
+
+            } catch (Exception e) {
+                api.logging().logToOutput("AuraTab: JSON minification failed, trying manual cleanup: " + e.getMessage());
+
+                // Strategy 2: Manual minification - remove unnecessary whitespace
+                cleaned = minifyJsonManually(cleaned);
+            }
+        }
+
+        // Strategy 3: Handle common issues with single-line JSON in HTTP bodies
         // Fix potential line break issues within JSON strings
         if (cleaned.contains("\\n") && !cleaned.contains("\n")) {
             // Has escaped newlines but no actual newlines - might be properly escaped
             api.logging().logToOutput("AuraTab: JSON contains escaped newlines, leaving as-is");
         }
 
-        // Try parsing again after cleanup
+        // Final validation attempt
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             mapper.readTree(cleaned);
@@ -560,6 +596,57 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
             api.logging().logToOutput("AuraTab: JSON cleanup failed, returning original: " + e.getMessage());
             return json; // Return original if all cleanup attempts fail
         }
+    }
+
+    /**
+     * Manually minify JSON by removing unnecessary whitespace
+     */
+    private String minifyJsonManually(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return json;
+        }
+
+        StringBuilder result = new StringBuilder();
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            if (escaped) {
+                result.append(c);
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\' && inString) {
+                escaped = true;
+                result.append(c);
+                continue;
+            }
+
+            if (c == '"') {
+                inString = !inString;
+                result.append(c);
+                continue;
+            }
+
+            if (inString) {
+                result.append(c);
+                continue;
+            }
+
+            // Outside of strings, remove unnecessary whitespace
+            if (Character.isWhitespace(c)) {
+                // Skip whitespace outside of strings
+                continue;
+            }
+
+            result.append(c);
+        }
+
+        api.logging().logToOutput("AuraTab: Manual JSON minification applied");
+        return result.toString();
     }
 
     /**
