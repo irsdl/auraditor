@@ -861,19 +861,26 @@ public class ActionsTab {
      */
     private void clearBusyState() {
         isProcessing = false;
-        
+
         // Restore active button
         if (currentActiveButton != null) {
             currentActiveButton.setText(originalButtonText);
             currentActiveButton = null;
             originalButtonText = "";
         }
-        
+
+        // Explicitly restore passive search button texts in case they were updated with progress
+        // This ensures buttons show their original labels even if progress updates bypassed setBusyState
+        getRouterInitializerPathsBtn.setText("Router Initializer Paths From Sitemap");
+        getPotentialPathsFromJSBtn.setText("Potential Paths From Sitemap");
+        findDescriptorsFromSitemapBtn.setText("Find Descriptors From Sitemap");
+        performAllSitemapSearchesBtn.setText("Perform All Sitemap Searches");
+
         // Hide cancel button
         cancelBtn.setVisible(false);
         statusPanel.revalidate();
         statusPanel.repaint();
-        
+
         // Re-enable buttons based on current state
         updateUIForRequestAvailability(!baseRequests.isEmpty());
         clearStatusMessage();
