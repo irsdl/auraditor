@@ -1157,7 +1157,9 @@ public class ActionsTab {
 
             // Initialize results
             currentRouterPathsResults = new RouteDiscoveryResult();
-            String timestamp = java.time.LocalDateTime.now().format(
+
+            // Generate session timestamp that will be used for the entire parsing session
+            String sessionTimestamp = java.time.LocalDateTime.now().format(
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
             // Get sitemap items
@@ -1218,7 +1220,7 @@ public class ActionsTab {
 
                 try {
                     // Process the JavaScript response
-                    processJavaScriptResponseForRouterPaths(item, resultId);
+                    processJavaScriptResponseForRouterPaths(item, resultId, sessionTimestamp);
 
                     // Update progress
                     int processed = processedItems.incrementAndGet();
@@ -1236,8 +1238,10 @@ public class ActionsTab {
                 }
             }
 
-            // Completion
+            // Finalize results
             SwingUtilities.invokeLater(() -> {
+                finalizeRouterPathsResults(resultId, sessionTimestamp);
+
                 clearBusyState();
                 int pathsFound = discoveredRouterPaths.size();
                 showStatusMessage("✓ Router paths parsing completed: " + pathsFound + " unique paths found",
@@ -1260,7 +1264,7 @@ public class ActionsTab {
     /**
      * Process a JavaScript response to extract router initializer paths
      */
-    private void processJavaScriptResponseForRouterPaths(HttpRequestResponse item, String resultId) {
+    private void processJavaScriptResponseForRouterPaths(HttpRequestResponse item, String resultId, String sessionTimestamp) {
         try {
             String responseBody = item.response().bodyToString();
 
@@ -1271,7 +1275,7 @@ public class ActionsTab {
             }
 
             // Enhanced approach: Find routes object and extract using balanced brace matching
-            extractRoutesFromJson(responseBody, resultId);
+            extractRoutesFromJson(responseBody, resultId, sessionTimestamp);
 
         } catch (Exception e) {
             api.logging().logToOutput("Error extracting router paths from JavaScript response: " + e.getMessage());
@@ -1281,7 +1285,7 @@ public class ActionsTab {
     /**
      * Enhanced route extraction using balanced brace matching for complex nested JSON
      */
-    private void extractRoutesFromJson(String responseBody, String resultId) {
+    private void extractRoutesFromJson(String responseBody, String resultId, String sessionTimestamp) {
         try {
             // Find the start of the routes object
             Matcher routesObjectMatcher = ROUTES_OBJECT_PATTERN.matcher(responseBody);
@@ -1294,10 +1298,10 @@ public class ActionsTab {
 
                 if (routesJson != null && !routesJson.isEmpty()) {
                     // Try to parse as JSON for robust extraction
-                    extractRoutePathsFromRoutesJson(routesJson, resultId);
+                    extractRoutePathsFromRoutesJson(routesJson, resultId, sessionTimestamp);
 
                     // Fallback: Also try regex pattern matching for additional coverage
-                    extractRoutePathsWithRegex(routesJson, resultId);
+                    extractRoutePathsWithRegex(routesJson, resultId, sessionTimestamp);
                 }
             }
         } catch (Exception e) {
@@ -1353,7 +1357,7 @@ public class ActionsTab {
     /**
      * Extract route paths using JSON parsing approach
      */
-    private void extractRoutePathsFromRoutesJson(String routesJson, String resultId) {
+    private void extractRoutePathsFromRoutesJson(String routesJson, String resultId, String sessionTimestamp) {
         try {
             // Use Jackson to parse the routes JSON
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -1364,11 +1368,7 @@ public class ActionsTab {
                 if (routePath.startsWith("/")) {
                     // Add to discovered paths (Set automatically handles duplicates)
                     if (discoveredRouterPaths.add(routePath)) {
-                        // New path discovered - add to results immediately
-                        SwingUtilities.invokeLater(() -> {
-                            addRouterPathToResults(routePath, resultId);
-                        });
-
+                        // New path discovered - just log it, will be added in batch at the end
                         api.logging().logToOutput("Found router path (JSON): " + routePath);
                     }
                 }
@@ -1383,7 +1383,7 @@ public class ActionsTab {
     /**
      * Fallback regex-based route extraction for additional coverage
      */
-    private void extractRoutePathsWithRegex(String routesContent, String resultId) {
+    private void extractRoutePathsWithRegex(String routesContent, String resultId, String sessionTimestamp) {
         try {
             // Extract individual route paths using improved regex
             Pattern enhancedRoutePattern = Pattern.compile("\"(/[^\"]+?)\"\\s*:", Pattern.CASE_INSENSITIVE);
@@ -1394,11 +1394,7 @@ public class ActionsTab {
 
                 // Add to discovered paths (Set automatically handles duplicates)
                 if (discoveredRouterPaths.add(routePath)) {
-                    // New path discovered - add to results immediately
-                    SwingUtilities.invokeLater(() -> {
-                        addRouterPathToResults(routePath, resultId);
-                    });
-
+                    // New path discovered - just log it, will be added in batch at the end
                     api.logging().logToOutput("Found router path (regex): " + routePath);
                 }
             }
@@ -1408,25 +1404,43 @@ public class ActionsTab {
     }
 
     /**
-     * Add a router path to the results tab immediately
+     * Finalize router paths results by adding all discovered paths in batch
      */
-    private void addRouterPathToResults(String path, String resultId) {
-        if (currentRouterPathsResults != null) {
-            String timestamp = java.time.LocalDateTime.now().format(
-                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String categoryName = "Router Initializer Paths (" + timestamp + ")";
+    private void finalizeRouterPathsResults(String resultId, String sessionTimestamp) {
+        if (currentRouterPathsResults != null && !discoveredRouterPaths.isEmpty()) {
+            String categoryName = "Router Initializer Paths (" + sessionTimestamp + ")";
 
-            // Add the path to results
-            List<String> paths = currentRouterPathsResults.getRoutesForCategory(categoryName);
-            if (paths == null) {
-                paths = new ArrayList<>();
-                currentRouterPathsResults.addRouteCategory(categoryName, paths);
+            // Convert Set to List for the results
+            List<String> pathsList = new ArrayList<>(discoveredRouterPaths);
+
+            // Clear any existing category with the same name (in case of tab reuse)
+            if (shouldReuseTab()) {
+                // Remove old category to replace with new results
+                currentRouterPathsResults.getRouteEntries().remove(categoryName);
             }
-            paths.add(path);
+
+            // Add all paths to results in one batch
+            currentRouterPathsResults.addRouteCategory(categoryName, pathsList);
 
             // Update the results tab
-            resultTabCallback.updateDiscoveredRoutesTab(resultId, currentRouterPathsResults);
+            if (resultTabCallback != null) {
+                if (shouldReuseTab()) {
+                    resultTabCallback.updateDiscoveredRoutesTab(resultId, currentRouterPathsResults);
+                } else {
+                    resultTabCallback.createDiscoveredRoutesTab(resultId, currentRouterPathsResults);
+                }
+            }
+
+            api.logging().logToOutput("Finalized router paths results: " + pathsList.size() + " paths in category '" + categoryName + "'");
         }
+    }
+
+    /**
+     * Add a router path to the results tab immediately (deprecated - kept for compatibility)
+     */
+    private void addRouterPathToResults(String path, String resultId) {
+        // This method is now deprecated in favor of batch processing
+        // Left for compatibility but no longer used in new code
     }
 
     /**
@@ -6868,7 +6882,7 @@ public class ActionsTab {
                 try {
                     // Process with router paths processor
                     if (!routerPathsCancelled) {
-                        processJavaScriptResponseForRouterPaths(jsResponse, "consolidated");
+                        processJavaScriptResponseForRouterPaths(jsResponse, "consolidated", jsTimestamp);
                     }
 
                     // Process with JS paths processor
