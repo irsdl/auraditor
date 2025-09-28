@@ -27,7 +27,15 @@ Installs Aura tabs on HTTP message editors (Interceptor, Repeater, etc). Decodes
 - **Real-time Change Detection** - Immediate request updates when editing parameters
 - **Dark Mode Support** - Proper theme integration with Burp Suite
 
-*Note: Screenshots will be updated in future releases to reflect the current enhanced interface.*
+## Screenshots
+
+### Main Interface
+![Auraditor Main Interface](examples/burp_tool_tab.png)
+*Comprehensive Lightning/Aura framework security testing interface with organized sections for Active/Passive Router Discovery, Object Discovery, and advanced request modification capabilities.*
+
+### Request Editor
+![Request Editor Interface](examples/request.png)
+*Enhanced request editor with Aura Actions, Context, and Message tabs for detailed Lightning framework parameter analysis and modification.*
 
 ## Requirements
 - Java 21 or higher (required for latest Burp Suite 2025 performance optimizations)
