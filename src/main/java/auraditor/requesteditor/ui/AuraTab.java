@@ -165,6 +165,9 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
             return;
         }
 
+        // Enhanced JSON processing to handle different formats
+        jsonText = enhancedJsonProcessing(jsonText);
+
         // Debug logging for multiline JSON issues
         if (jsonText.contains("\n") || jsonText.contains("\r")) {
             api.logging().logToOutput("AuraTab: Processing multiline JSON with " +
@@ -360,7 +363,13 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
         int endIndex = findParameterEnd(body, startIndex);
 
         String paramValue = body.substring(startIndex, endIndex);
-        return Utils.urlDecode(paramValue);
+
+        // Only URL decode if the content appears to be URL-encoded
+        if (isUrlEncoded(paramValue)) {
+            return Utils.urlDecode(paramValue);
+        } else {
+            return paramValue;
+        }
     }
 
     /**
@@ -483,5 +492,94 @@ public class AuraTab implements ExtensionProvidedHttpRequestEditor, ExtensionPro
         }
 
         return processed;
+    }
+
+    /**
+     * Enhanced JSON processing to handle different input formats
+     */
+    private String enhancedJsonProcessing(String jsonText) {
+        if (jsonText == null || jsonText.trim().isEmpty()) {
+            return jsonText;
+        }
+
+        String processed = jsonText.trim();
+
+        // Check if this looks like it might still be URL-encoded despite our earlier processing
+        if (isUrlEncoded(processed)) {
+            try {
+                processed = Utils.urlDecode(processed);
+                api.logging().logToOutput("AuraTab: Applied additional URL decoding");
+            } catch (Exception e) {
+                api.logging().logToOutput("AuraTab: Additional URL decoding failed, using original");
+            }
+        }
+
+        // Normalize line endings and handle various JSON formatting issues
+        processed = processed.replace("\r\n", "\n").replace("\r", "\n");
+
+        // Try to validate and reformat the JSON to ensure it's valid
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(processed);
+
+            // If we successfully parsed it, we can optionally reformat it for consistency
+            // But keep original formatting to preserve user intent
+            api.logging().logToOutput("AuraTab: JSON validation successful");
+            return processed;
+        } catch (Exception e) {
+            api.logging().logToOutput("AuraTab: JSON validation failed, will attempt preprocessing: " + e.getMessage());
+
+            // If JSON parsing failed, try various cleanup approaches
+            return attemptJsonCleanup(processed);
+        }
+    }
+
+    /**
+     * Attempt to clean up malformed JSON
+     */
+    private String attemptJsonCleanup(String json) {
+        String cleaned = json;
+
+        // Remove any leading/trailing whitespace
+        cleaned = cleaned.trim();
+
+        // Handle common issues with single-line JSON in HTTP bodies
+        // Fix potential line break issues within JSON strings
+        if (cleaned.contains("\\n") && !cleaned.contains("\n")) {
+            // Has escaped newlines but no actual newlines - might be properly escaped
+            api.logging().logToOutput("AuraTab: JSON contains escaped newlines, leaving as-is");
+        }
+
+        // Try parsing again after cleanup
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.readTree(cleaned);
+            api.logging().logToOutput("AuraTab: JSON cleanup successful");
+            return cleaned;
+        } catch (Exception e) {
+            api.logging().logToOutput("AuraTab: JSON cleanup failed, returning original: " + e.getMessage());
+            return json; // Return original if all cleanup attempts fail
+        }
+    }
+
+    /**
+     * Check if a string appears to be URL-encoded
+     */
+    private boolean isUrlEncoded(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+
+        // Look for URL-encoded patterns
+        return text.contains("%") && (
+            text.contains("%7B") ||  // {
+            text.contains("%7D") ||  // }
+            text.contains("%22") ||  // "
+            text.contains("%20") ||  // space
+            text.contains("%3A") ||  // :
+            text.contains("%2C") ||  // ,
+            text.contains("%5B") ||  // [
+            text.contains("%5D")     // ]
+        );
     }
 }
