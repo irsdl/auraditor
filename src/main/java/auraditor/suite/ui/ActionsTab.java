@@ -354,6 +354,7 @@ public class ActionsTab {
     private final JButton getRouterInitializerPathsBtn;
     private final JButton getPotentialPathsFromJSBtn;
     private final JButton findDescriptorsFromSitemapBtn;
+    private final JButton performAllSitemapSearchesBtn;
     private final JCheckBox searchSitemapOnlyCheckbox;
     private final JComboBox<String> discoveryResultSelector;
     private final JLabel statusMessageLabel;
@@ -494,6 +495,7 @@ public class ActionsTab {
         this.getRouterInitializerPathsBtn = new JButton("Router Initializer Paths From Sitemap");
         this.getPotentialPathsFromJSBtn = new JButton("Potential Paths From Sitemap");
         this.findDescriptorsFromSitemapBtn = new JButton("Find Descriptors From Sitemap");
+        this.performAllSitemapSearchesBtn = new JButton("Perform All Sitemap Searches");
         this.searchSitemapOnlyCheckbox = new JCheckBox("Search sitemap only", true);
         this.cancelBtn = new JButton("Cancel");
         this.discoveryResultSelector = new JComboBox<>();
@@ -661,6 +663,11 @@ public class ActionsTab {
         findDescriptorsFromSitemapBtn.setToolTipText("Extract Apex descriptors from JavaScript files in sitemap (passive)");
         findDescriptorsFromSitemapBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(findDescriptorsFromSitemapBtn, gbc);
+
+        gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
+        performAllSitemapSearchesBtn.setToolTipText("Perform all three sitemap searches at once (router paths, JS paths, and descriptors)");
+        performAllSitemapSearchesBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
+        actionsPanel.add(performAllSitemapSearchesBtn, gbc);
 
         gbc.gridy++; gbc.gridwidth = 2; gbc.gridx = 0;
         searchSitemapOnlyCheckbox.setToolTipText("When checked, limit passive parsing to sitemap only (applies to sitemap parsing buttons above)");
@@ -3230,6 +3237,7 @@ public class ActionsTab {
         getRouterInitializerPathsBtn.addActionListener(e -> executeAction("GetRouterInitializerPaths"));
         getPotentialPathsFromJSBtn.addActionListener(e -> executeAction("GetPotentialPathsFromJS"));
         findDescriptorsFromSitemapBtn.addActionListener(e -> executeAction("FindDescriptorsFromSitemap"));
+        performAllSitemapSearchesBtn.addActionListener(e -> executeAction("PerformAllSitemapSearches"));
 
         // Record ID field handler - enable/disable button based on text content
         recordIdField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
@@ -3643,6 +3651,28 @@ public class ActionsTab {
                         });
                     }
                 }, "DescriptorsFromSitemap-" + descriptorsResultId).start();
+                break;
+
+            case "PerformAllSitemapSearches":
+                setBusyState(performAllSitemapSearchesBtn, "All Sitemap Searches");
+
+                api.logging().logToOutput("Starting all passive sitemap searches...");
+
+                // Check sitemap only checkbox state
+                boolean sitemapOnlyAll = searchSitemapOnlyCheckbox.isSelected();
+
+                // Perform all sitemap searches in background thread
+                ThreadManager.createManagedThread(() -> {
+                    try {
+                        performAllSitemapSearches(selectedRequest, sitemapOnlyAll);
+                    } catch (Exception e) {
+                        SwingUtilities.invokeLater(() -> {
+                            clearBusyState();
+                            showErrorMessage("Error during all sitemap searches: " + e.getMessage());
+                            api.logging().logToError("All sitemap searches failed: " + e.getMessage());
+                        });
+                    }
+                }, "AllSitemapSearches").start();
                 break;
         }
     }
@@ -6674,4 +6704,150 @@ public class ActionsTab {
             api.logging().logToError("Error during ActionsTab cleanup: " + e.getMessage());
         }
     }
+
+    /**
+     * Perform all three sitemap searches at once to avoid multiple sitemap iterations
+     */
+    private void performAllSitemapSearches(BaseRequest baseRequest, boolean sitemapOnly) {
+        api.logging().logToOutput("Starting consolidated sitemap parsing for all search types (sitemap only: " + sitemapOnly + ")...");
+
+        try {
+            // Reset cancellation flags and discovered items for all searches
+            routerPathsCancelled = false;
+            jsPathsCancelled = false;
+            descriptorsCancelled = false;
+            discoveredRouterPaths.clear();
+            discoveredJSPaths.clear();
+            discoveredDescriptors.clear();
+
+            // Process sitemap with all three processors at once
+            processSitemapWithMultipleProcessors(baseRequest, sitemapOnly);
+
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showErrorMessage("Error during consolidated sitemap searches: " + e.getMessage());
+                api.logging().logToError("Consolidated sitemap searches failed: " + e.getMessage());
+            });
+        }
+    }
+
+    /**
+     * Process sitemap once with multiple processors to avoid multiple iterations
+     */
+    private void processSitemapWithMultipleProcessors(BaseRequest baseRequest, boolean sitemapOnly) {
+
+        try {
+            // Get sitemap items once
+            api.logging().logToOutput("Retrieving sitemap entries for all searches...");
+            List<HttpRequestResponse> sitemapItems = new ArrayList<>();
+            sitemapItems.addAll(api.siteMap().requestResponses());
+
+            api.logging().logToOutput("Total sitemap items retrieved: " + sitemapItems.size());
+
+            // Filter for JavaScript responses once
+            List<HttpRequestResponse> jsResponses = new ArrayList<>();
+            for (HttpRequestResponse item : sitemapItems) {
+                // Check for cancellation from any search
+                if (routerPathsCancelled || jsPathsCancelled || descriptorsCancelled ||
+                    operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("Consolidated sitemap searches cancelled by user");
+                    return;
+                }
+
+                try {
+                    if (item.response() != null && item.response().mimeType() == MimeType.SCRIPT) {
+                        // Apply scope filtering if sitemapOnly is false
+                        if (!sitemapOnly || api.scope().isInScope(item.request().url())) {
+                            jsResponses.add(item);
+                        }
+                    }
+                } catch (Exception e) {
+                    api.logging().logToError("Error filtering JavaScript response: " + e.getMessage());
+                }
+            }
+
+            api.logging().logToOutput("JavaScript responses found: " + jsResponses.size());
+
+            // Process each JavaScript response with all three processors
+            AtomicInteger processedItems = new AtomicInteger(0);
+            int totalItems = jsResponses.size();
+
+            // Generate timestamp for JS paths processing (required by that method)
+            String jsTimestamp = generateTimestamp();
+
+            for (HttpRequestResponse jsResponse : jsResponses) {
+                // Check for cancellation from any search
+                if (routerPathsCancelled || jsPathsCancelled || descriptorsCancelled ||
+                    operationCancelled || Thread.currentThread().isInterrupted()) {
+                    api.logging().logToOutput("Consolidated sitemap searches cancelled by user");
+                    return;
+                }
+
+                try {
+                    // Process with router paths processor
+                    if (!routerPathsCancelled) {
+                        processJavaScriptResponseForRouterPaths(jsResponse, "consolidated");
+                    }
+
+                    // Process with JS paths processor
+                    if (!jsPathsCancelled) {
+                        processJavaScriptResponseForPaths(jsResponse, baseRequest, jsTimestamp);
+                    }
+
+                    // Process with descriptors processor
+                    if (!descriptorsCancelled) {
+                        processJavaScriptResponseForDescriptors(jsResponse, jsTimestamp);
+                    }
+
+                    // Update progress
+                    int processed = processedItems.incrementAndGet();
+                    int progress = (processed * 100) / totalItems;
+
+                    // Update status for all searches
+                    SwingUtilities.invokeLater(() -> {
+                        performAllSitemapSearchesBtn.setText("⟳ All Searches (" + progress + "%)");
+                    });
+
+                    if (processed % 10 == 0) {
+                        api.logging().logToOutput("Processed " + processed + "/" + totalItems +
+                            " JavaScript files for all searches (" + progress + "%)");
+                    }
+
+                } catch (Exception e) {
+                    api.logging().logToError("Error processing JavaScript response in consolidated search: " + e.getMessage());
+                }
+            }
+
+            // Completion
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+
+                int routerPathsFound = discoveredRouterPaths.size();
+                int jsPathsFound = discoveredJSPaths.size();
+                int descriptorsFound = discoveredDescriptors.size();
+                int totalFound = routerPathsFound + jsPathsFound + descriptorsFound;
+
+                showStatusMessage("✓ All sitemap searches completed: " +
+                    routerPathsFound + " router paths, " +
+                    jsPathsFound + " JS paths, " +
+                    descriptorsFound + " descriptors found",
+                    totalFound > 0 ? Color.GREEN : Color.ORANGE);
+
+                api.logging().logToOutput("All sitemap searches completed successfully:");
+                api.logging().logToOutput("  JavaScript responses analyzed: " + totalItems);
+                api.logging().logToOutput("  Router paths found: " + routerPathsFound);
+                api.logging().logToOutput("  JS paths found: " + jsPathsFound);
+                api.logging().logToOutput("  Descriptors found: " + descriptorsFound);
+            });
+
+        } catch (Exception e) {
+            SwingUtilities.invokeLater(() -> {
+                clearBusyState();
+                showErrorMessage("Error during consolidated sitemap processing: " + e.getMessage());
+                api.logging().logToError("Consolidated sitemap processing failed: " + e.getMessage());
+            });
+        }
+    }
+
 }
