@@ -1,0 +1,93 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Extract version from pom.xml
+      id: extract_version
+      run: |
+        VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Extracted version: $VERSION"
+
+    - name: Build with Maven
+      run: mvn clean package
+
+    - name: Get JAR file name
+      id: jar_name
+      run: |
+        JAR_FILE=$(ls target/auraditor-*.jar | head -1)
+        JAR_NAME=$(basename "$JAR_FILE")
+        echo "jar_file=$JAR_FILE" >> $GITHUB_OUTPUT
+        echo "jar_name=$JAR_NAME" >> $GITHUB_OUTPUT
+        echo "Found JAR: $JAR_NAME"
+
+    - name: Check if release exists
+      id: check_release
+      run: |
+        RELEASE_EXISTS=$(gh release view "v${{ steps.extract_version.outputs.version }}" > /dev/null 2>&1 && echo "true" || echo "false")
+        echo "release_exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
+        echo "Release v${{ steps.extract_version.outputs.version }} exists: $RELEASE_EXISTS"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Delete existing release if it exists
+      if: steps.check_release.outputs.release_exists == 'true'
+      run: |
+        echo "Deleting existing release v${{ steps.extract_version.outputs.version }}"
+        gh release delete "v${{ steps.extract_version.outputs.version }}" --yes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        echo "Creating release v${{ steps.extract_version.outputs.version }}"
+        gh release create "v${{ steps.extract_version.outputs.version }}" \
+          "${{ steps.jar_name.outputs.jar_file }}" \
+          --title "Auraditor v${{ steps.extract_version.outputs.version }}" \
+          --notes "Auraditor Burp Suite Extension v${{ steps.extract_version.outputs.version }}
+
+        ## Installation
+        1. Download the \`${{ steps.jar_name.outputs.jar_name }}\` file from this release
+        2. In Burp Suite, go to Extensions → Installed → Add
+        3. Select the downloaded JAR file
+        4. The Auraditor extension will be loaded and available in Burp Suite
+
+        ## Features
+        - Lightning/Aura framework security testing
+        - Advanced action management and context editing
+        - Route discovery and sitemap analysis
+        - Object discovery and enumeration
+        - Request modification and response analysis
+
+        For more information, see the [README](https://github.com/irsdl/auraditor/blob/main/README.md)."
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifact for PR/manual runs
+      if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: auraditor-v${{ steps.extract_version.outputs.version }}
+        path: ${{ steps.jar_name.outputs.jar_file }}
+        retention-days: 30

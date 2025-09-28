@@ -87,12 +87,22 @@ In Burp Suite:
 
 **Auraditor (Professional Security Testing Tool):**
 - **Soroush Dalili** ([@irsdl](https://github.com/irsdl)) - Project maintainer, enhanced features, modernization, and improvements
-- **AI Collaboration** - Technical implementation, API migration, and code optimization
+- **AI Collaboration** - Technical implementation, API migration, and code optimization!
 
 **Original Foundation:**
 - **Salesforce.com, Inc.** - Original Lightning Burp extension development ([archived project](https://github.com/salesforce/lightning-burp))
 
 Auraditor represents a significant evolution from the original codebase, with extensive modernization, new features, and improved user experience. While built upon the foundation of the original Salesforce project, this is an independent project with its own development direction and maintenance.
+
+### Acknowledgments & Inspiration
+Special thanks to the following projects for inspiration and advancing Salesforce security testing:
+
+- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
+- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
+
+These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
+
+
 
 ## Versioning Strategy
 
@@ -128,10 +138,3 @@ The original [salesforce/lightning-burp](https://github.com/salesforce/lightning
 - [**Exposing Broken Access Controls in Salesforce-based Applications**](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/) - In-depth analysis of access control vulnerabilities in Salesforce applications
 - [**Misconfigured Salesforce Experiences**](https://www.varonis.com/blog/misconfigured-salesforce-experiences) - Common misconfigurations and security issues in Salesforce implementations
 
-### Acknowledgments & Inspiration
-Special thanks to the following projects for inspiration and advancing Salesforce security testing:
-
-- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
-- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
-
-These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
