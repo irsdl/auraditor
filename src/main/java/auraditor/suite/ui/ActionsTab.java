@@ -3448,8 +3448,8 @@ public class ActionsTab {
             case "GetNavItems":
                 setBusyState(getNavItemsBtn, "Route Discovery");
 
-                // Generate result ID for route discovery
-                String routeResultId = generateRouteDiscoveryResultId();
+                // Generate result ID for route discovery with tab reuse check
+                String routeResultId = generateRouteDiscoveryResultIdWithReuseCheck();
 
                 api.logging().logToOutput("Starting route discovery...");
 
