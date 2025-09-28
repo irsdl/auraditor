@@ -1,3 +1,4 @@
+# Maven build artifacts
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -10,10 +11,39 @@ buildNumber.properties
 
 # Avoid ignoring Maven wrapper jar file (.jar files are usually ignored)
 !/.mvn/wrapper/maven-wrapper.jar
+
+# IDE and editor files
 .DS_Store
 dist/
 .idea/
 Auraditor.iml
-.vscode
-.mvn
-tempai
+.vscode/
+.mvn/
+
+# Claude Code assistant files
+.claude/
+
+# Temporary and cache directories
+tempai/
+temp/
+tmp/
+.cache/
+.temp/
+
+# Log files
+*.log
+*.log.*
+
+# Environment and configuration files
+.env
+.env.local
+.env.*.local
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~
