@@ -408,6 +408,38 @@ public class ActionsTab {
         Pattern.MULTILINE
     );
 
+    /**
+     * Validate if a path should be included in results
+     * Filters out comment blocks and image/font file extensions
+     */
+    private boolean isValidPath(String path) {
+        if (path == null || path.trim().isEmpty()) {
+            return false;
+        }
+
+        // Remove paths that are comments (start with /* and end with */)
+        if (path.startsWith("/*") && path.endsWith("*/")) {
+            return false;
+        }
+
+        // Get the path without query string for extension checking
+        String pathWithoutQuery = path.split("\\?")[0];
+
+        // Remove paths ending with image or font file extensions
+        String[] unwantedExtensions = {
+            ".svg", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico",
+            ".woff", ".woff2", ".ttf", ".eot", ".otf"
+        };
+
+        for (String extension : unwantedExtensions) {
+            if (pathWithoutQuery.toLowerCase().endsWith(extension)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static final Pattern JS_URL_PATH_PATTERN = Pattern.compile(
         "(?:[\"'`])(https?://[^/\"'`\\s<>{}\\[\\]\\\\]+(/[^\"'`\\s<>{}\\[\\]\\\\]*(?:/[^\"'`\\s<>{}\\[\\]\\\\]*)*)?)(?:[\"'`])",
         Pattern.MULTILINE | Pattern.CASE_INSENSITIVE
@@ -1365,7 +1397,7 @@ public class ActionsTab {
 
             // Iterate through all field names (which are the route paths)
             routesNode.fieldNames().forEachRemaining(routePath -> {
-                if (routePath.startsWith("/")) {
+                if (routePath.startsWith("/") && isValidPath(routePath)) {
                     // Add to discovered paths (Set automatically handles duplicates)
                     if (discoveredRouterPaths.add(routePath)) {
                         // New path discovered - just log it, will be added in batch at the end
@@ -1392,8 +1424,8 @@ public class ActionsTab {
             while (pathMatcher.find()) {
                 String routePath = pathMatcher.group(1);
 
-                // Add to discovered paths (Set automatically handles duplicates)
-                if (discoveredRouterPaths.add(routePath)) {
+                // Add to discovered paths (Set automatically handles duplicates) with validation
+                if (isValidPath(routePath) && discoveredRouterPaths.add(routePath)) {
                     // New path discovered - just log it, will be added in batch at the end
                     api.logging().logToOutput("Found router path (regex): " + routePath);
                 }
@@ -2127,8 +2159,8 @@ public class ActionsTab {
      * Add a discovered JS path to the results, handling duplicates
      */
     private void addJSPathToResults(String path, String pathType, HttpRequestResponse sourceResponse, String sessionTimestamp) {
-        if (path == null || discoveredJSPaths.contains(path)) {
-            return; // Skip duplicates
+        if (path == null || discoveredJSPaths.contains(path) || !isValidPath(path)) {
+            return; // Skip duplicates and invalid paths
         }
 
         // Add to discovered set
@@ -3818,6 +3850,7 @@ public class ActionsTab {
         getRouterInitializerPathsBtn.setEnabled(true);
         getPotentialPathsFromJSBtn.setEnabled(true);
         findDescriptorsFromSitemapBtn.setEnabled(true);
+        performAllSitemapSearchesBtn.setEnabled(true);
 
         // Get Record by ID depends on both having requests and non-empty record ID
         updateRecordByIdButtonState();
@@ -6815,8 +6848,18 @@ public class ActionsTab {
             discoveredJSPaths.clear();
             discoveredDescriptors.clear();
 
+            // Generate result IDs for each search type
+            String routerPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+            String jsPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+            String descriptorsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+
+            // Initialize results objects for all searches
+            currentRouterPathsResults = new RouteDiscoveryResult();
+            currentJSPathsResults = new RouteDiscoveryResult();
+            currentDescriptorResults = new RouteDiscoveryResult();
+
             // Process sitemap with all three processors at once
-            processSitemapWithMultipleProcessors(baseRequest, sitemapOnly);
+            processSitemapWithMultipleProcessors(baseRequest, sitemapOnly, routerPathsResultId, jsPathsResultId, descriptorsResultId);
 
         } catch (Exception e) {
             SwingUtilities.invokeLater(() -> {
@@ -6830,7 +6873,7 @@ public class ActionsTab {
     /**
      * Process sitemap once with multiple processors to avoid multiple iterations
      */
-    private void processSitemapWithMultipleProcessors(BaseRequest baseRequest, boolean sitemapOnly) {
+    private void processSitemapWithMultipleProcessors(BaseRequest baseRequest, boolean sitemapOnly, String routerPathsResultId, String jsPathsResultId, String descriptorsResultId) {
 
         try {
             // Get sitemap items once
@@ -6914,14 +6957,41 @@ public class ActionsTab {
                 }
             }
 
-            // Completion
+            // Completion - finalize all results and create tabs
             SwingUtilities.invokeLater(() -> {
-                clearBusyState();
+                // Generate session timestamp for this consolidated operation
+                String sessionTimestamp = java.time.LocalDateTime.now().format(
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
                 int routerPathsFound = discoveredRouterPaths.size();
                 int jsPathsFound = discoveredJSPaths.size();
                 int descriptorsFound = discoveredDescriptors.size();
                 int totalFound = routerPathsFound + jsPathsFound + descriptorsFound;
+
+                // Finalize router paths results
+                if (routerPathsFound > 0 && currentRouterPathsResults != null) {
+                    finalizeRouterPathsResults(routerPathsResultId, sessionTimestamp);
+                }
+
+                // Finalize JS paths results
+                if (jsPathsFound > 0 && currentJSPathsResults != null && resultTabCallback != null) {
+                    if (shouldReuseTab()) {
+                        resultTabCallback.updateDiscoveredRoutesTab(jsPathsResultId, currentJSPathsResults);
+                    } else {
+                        resultTabCallback.createDiscoveredRoutesTab(jsPathsResultId, currentJSPathsResults);
+                    }
+                }
+
+                // Finalize descriptors results
+                if (descriptorsFound > 0 && currentDescriptorResults != null && resultTabCallback != null) {
+                    if (shouldReuseTab()) {
+                        resultTabCallback.updateDiscoveredRoutesTab(descriptorsResultId, currentDescriptorResults);
+                    } else {
+                        resultTabCallback.createDiscoveredRoutesTab(descriptorsResultId, currentDescriptorResults);
+                    }
+                }
+
+                clearBusyState();
 
                 showStatusMessage("✓ All sitemap searches completed: " +
                     routerPathsFound + " router paths, " +
