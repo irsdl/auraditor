@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="logo.svg" alt="Auraditor Logo" width="300" height="80">
+</div>
+
 # Auraditor
 
 A professional Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
