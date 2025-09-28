@@ -431,8 +431,14 @@ public class ActionsTab {
     );
 
     private static final Pattern DESCRIPTOR_CONTEXT_PATTERN = Pattern.compile(
-        "\"descriptor\"\\s*:\\s*\"(apex://[\\w\\._\\-$]+/ACTION\\$[\\w\\._\\-$]+)\"[^}]*(?:\"pa\"\\s*:\\s*(\\[[^\\]]*\\]))?",
+        "\"descriptor\"\\s*:\\s*\"(apex://[\\w\\._\\-$]+/ACTION\\$[\\w\\._\\-$]+)\"[^}]*?\"pa\"\\s*:\\s*(\\[[^\\]]*\\])",
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+    );
+
+    // Alternative pattern for descriptors without parameter context
+    private static final Pattern DESCRIPTOR_SIMPLE_PATTERN = Pattern.compile(
+        "\"descriptor\"\\s*:\\s*\"(apex://[\\w\\._\\-$]+/ACTION\\$[\\w\\._\\-$]+)\"",
+        Pattern.CASE_INSENSITIVE
     );
 
     private static final Pattern PARAMETER_PATTERN = Pattern.compile(
@@ -1721,13 +1727,18 @@ public class ActionsTab {
             String responseBody = jsResponse.response().bodyToString();
             String sourceUrl = jsResponse.request().url();
 
-            // Use the context pattern to find descriptors with their parameter definitions
+            // Keep track of processed descriptors to avoid duplicates
+            java.util.Set<String> processedInThisResponse = new java.util.HashSet<>();
+
+            // First pass: Find descriptors with their parameter definitions using enhanced pattern
             Matcher contextMatcher = DESCRIPTOR_CONTEXT_PATTERN.matcher(responseBody);
             while (contextMatcher.find()) {
                 String descriptor = contextMatcher.group(1);
                 String parameterArrayJson = contextMatcher.group(2);
 
                 if (descriptor != null && discoveredDescriptors.add(descriptor)) {
+                    processedInThisResponse.add(descriptor);
+
                     // Parse parameters if available
                     java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
                     if (parameterArrayJson != null && !parameterArrayJson.trim().isEmpty()) {
@@ -1740,9 +1751,76 @@ public class ActionsTab {
                 }
             }
 
+            // Second pass: Find descriptors without immediate parameter context, but search for parameters
+            Matcher simpleMatcher = DESCRIPTOR_SIMPLE_PATTERN.matcher(responseBody);
+            while (simpleMatcher.find()) {
+                String descriptor = simpleMatcher.group(1);
+
+                if (descriptor != null && !processedInThisResponse.contains(descriptor) && discoveredDescriptors.add(descriptor)) {
+                    // Try to find parameters for this descriptor elsewhere in the response
+                    java.util.List<DescriptorInfo.ParameterInfo> parameters = findParametersForDescriptor(responseBody, descriptor);
+
+                    // Create descriptor info
+                    DescriptorInfo descriptorInfo = new DescriptorInfo(descriptor, parameters, sourceUrl);
+                    addDescriptorToResults(descriptorInfo, sessionTimestamp);
+                }
+            }
+
         } catch (Exception e) {
             api.logging().logToError("Exception processing JavaScript response for descriptors: " + e.getMessage());
         }
+    }
+
+    /**
+     * Find parameters for a specific descriptor in the response body
+     */
+    private java.util.List<DescriptorInfo.ParameterInfo> findParametersForDescriptor(String responseBody, String targetDescriptor) {
+        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+
+        try {
+            // Escape the descriptor for regex search
+            String escapedDescriptor = Pattern.quote(targetDescriptor);
+
+            // Create a pattern to find parameter arrays associated with this descriptor
+            // Look for patterns like: "descriptor":"apex://...", ... "pa":[...]
+            Pattern descriptorWithParamsPattern = Pattern.compile(
+                "\"descriptor\"\\s*:\\s*\"" + escapedDescriptor + "\"[^}]*?\"pa\"\\s*:\\s*(\\[[^\\]]*\\])",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+            );
+
+            Matcher matcher = descriptorWithParamsPattern.matcher(responseBody);
+            while (matcher.find()) {
+                String parameterArrayJson = matcher.group(1);
+                if (parameterArrayJson != null && !parameterArrayJson.trim().isEmpty()) {
+                    java.util.List<DescriptorInfo.ParameterInfo> foundParams = parseParametersFromJson(parameterArrayJson);
+                    parameters.addAll(foundParams);
+                }
+            }
+
+            // If no parameters found with the primary pattern, try alternative approaches
+            if (parameters.isEmpty()) {
+                // Look for the descriptor in action arrays and extract parameters
+                // Pattern: "ac":[...{"descriptor":"target","pa":[...]}...]
+                Pattern actionArrayPattern = Pattern.compile(
+                    "\"ac\"\\s*:\\s*\\[[^\\]]*?\\{[^}]*?\"descriptor\"\\s*:\\s*\"" + escapedDescriptor + "\"[^}]*?\"pa\"\\s*:\\s*(\\[[^\\]]*\\])",
+                    Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+                );
+
+                Matcher actionMatcher = actionArrayPattern.matcher(responseBody);
+                while (actionMatcher.find()) {
+                    String parameterArrayJson = actionMatcher.group(1);
+                    if (parameterArrayJson != null && !parameterArrayJson.trim().isEmpty()) {
+                        java.util.List<DescriptorInfo.ParameterInfo> foundParams = parseParametersFromJson(parameterArrayJson);
+                        parameters.addAll(foundParams);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Error finding parameters for descriptor " + targetDescriptor + ": " + e.getMessage());
+        }
+
+        return parameters;
     }
 
     /**
@@ -1861,19 +1939,22 @@ public class ActionsTab {
             detailEntries = new java.util.ArrayList<>(detailEntries); // Create mutable copy
         }
 
-        // Format parameters for display
+        // Format parameters for display as JSON array
         String paramsDisplay;
         if (descriptorInfo.getParameters().isEmpty()) {
             paramsDisplay = "No parameters";
         } else {
             StringBuilder paramsBuilder = new StringBuilder();
-            for (DescriptorInfo.ParameterInfo param : descriptorInfo.getParameters()) {
-                if (paramsBuilder.length() > 0) {
-                    paramsBuilder.append("\n");
+            paramsBuilder.append("[");
+            for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
+                DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
+                if (i > 0) {
+                    paramsBuilder.append(",");
                 }
                 paramsBuilder.append("{\"name\":\"").append(param.getName())
                            .append("\",\"type\":\"").append(param.getType()).append("\"}");
             }
+            paramsBuilder.append("]");
             paramsDisplay = paramsBuilder.toString();
         }
 
