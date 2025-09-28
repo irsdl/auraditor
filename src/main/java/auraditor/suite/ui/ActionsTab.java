@@ -446,6 +446,11 @@ public class ActionsTab {
         "\"(/[^\"]+)\":\\s*\\{",
         Pattern.CASE_INSENSITIVE
     );
+    // Enhanced pattern for finding routes object with better nested handling
+    private static final Pattern ROUTES_OBJECT_PATTERN = Pattern.compile(
+        "\"routes\":\\s*\\{",
+        Pattern.CASE_INSENSITIVE
+    );
     
     // Object storage for discovered objects
     private final Set<String> discoveredDefaultObjects = new HashSet<>();
@@ -1140,13 +1145,8 @@ public class ActionsTab {
             api.logging().logToOutput("Retrieving sitemap entries...");
             List<HttpRequestResponse> sitemapItems = new ArrayList<>();
 
-            // Get all sitemap items (use proxy history as sitemap equivalent)
-            for (var proxyItem : api.proxy().history()) {
-                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
-                    proxyItem.finalRequest(),
-                    proxyItem.originalResponse()
-                ));
-            }
+            // Get all sitemap items (access actual sitemap, not just proxy history)
+            sitemapItems.addAll(api.siteMap().requestResponses());
 
             // Filter for JavaScript content-type and optionally scope
             List<HttpRequestResponse> jsResponses = new ArrayList<>();
@@ -1251,16 +1251,98 @@ public class ActionsTab {
                 return; // No routerInitializer found in this response
             }
 
-            // Look for routes object in the same response
-            Matcher routesMatcher = ROUTES_PATTERN.matcher(responseBody);
-            while (routesMatcher.find()) {
-                String routesContent = routesMatcher.group(1);
+            // Enhanced approach: Find routes object and extract using balanced brace matching
+            extractRoutesFromJson(responseBody, resultId);
 
-                // Extract individual route paths
-                Matcher pathMatcher = ROUTE_PATH_PATTERN.matcher(routesContent);
-                while (pathMatcher.find()) {
-                    String routePath = pathMatcher.group(1);
+        } catch (Exception e) {
+            api.logging().logToOutput("Error extracting router paths from JavaScript response: " + e.getMessage());
+        }
+    }
 
+    /**
+     * Enhanced route extraction using balanced brace matching for complex nested JSON
+     */
+    private void extractRoutesFromJson(String responseBody, String resultId) {
+        try {
+            // Find the start of the routes object
+            Matcher routesObjectMatcher = ROUTES_OBJECT_PATTERN.matcher(responseBody);
+
+            while (routesObjectMatcher.find()) {
+                int routesStart = routesObjectMatcher.end() - 1; // Position of opening brace
+
+                // Find the matching closing brace using balanced counting
+                String routesJson = extractBalancedBraces(responseBody, routesStart);
+
+                if (routesJson != null && !routesJson.isEmpty()) {
+                    // Try to parse as JSON for robust extraction
+                    extractRoutePathsFromRoutesJson(routesJson, resultId);
+
+                    // Fallback: Also try regex pattern matching for additional coverage
+                    extractRoutePathsWithRegex(routesJson, resultId);
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error in enhanced route extraction: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Extract balanced braces content starting from a given position
+     */
+    private String extractBalancedBraces(String text, int startPos) {
+        if (startPos >= text.length() || text.charAt(startPos) != '{') {
+            return null;
+        }
+
+        int braceCount = 0;
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = startPos; i < text.length(); i++) {
+            char c = text.charAt(i);
+
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\' && inString) {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString) {
+                if (c == '{') {
+                    braceCount++;
+                } else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0) {
+                        return text.substring(startPos, i + 1);
+                    }
+                }
+            }
+        }
+
+        return null; // Unbalanced braces
+    }
+
+    /**
+     * Extract route paths using JSON parsing approach
+     */
+    private void extractRoutePathsFromRoutesJson(String routesJson, String resultId) {
+        try {
+            // Use Jackson to parse the routes JSON
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode routesNode = mapper.readTree(routesJson);
+
+            // Iterate through all field names (which are the route paths)
+            routesNode.fieldNames().forEachRemaining(routePath -> {
+                if (routePath.startsWith("/")) {
                     // Add to discovered paths (Set automatically handles duplicates)
                     if (discoveredRouterPaths.add(routePath)) {
                         // New path discovered - add to results immediately
@@ -1268,13 +1350,41 @@ public class ActionsTab {
                             addRouterPathToResults(routePath, resultId);
                         });
 
-                        api.logging().logToOutput("Found router path: " + routePath);
+                        api.logging().logToOutput("Found router path (JSON): " + routePath);
                     }
                 }
-            }
+            });
 
         } catch (Exception e) {
-            api.logging().logToOutput("Error extracting router paths from JavaScript response: " + e.getMessage());
+            // JSON parsing failed, not necessarily an error as fallback will handle it
+            api.logging().logToOutput("JSON parsing failed for routes, using regex fallback: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Fallback regex-based route extraction for additional coverage
+     */
+    private void extractRoutePathsWithRegex(String routesContent, String resultId) {
+        try {
+            // Extract individual route paths using improved regex
+            Pattern enhancedRoutePattern = Pattern.compile("\"(/[^\"]+?)\"\\s*:", Pattern.CASE_INSENSITIVE);
+            Matcher pathMatcher = enhancedRoutePattern.matcher(routesContent);
+
+            while (pathMatcher.find()) {
+                String routePath = pathMatcher.group(1);
+
+                // Add to discovered paths (Set automatically handles duplicates)
+                if (discoveredRouterPaths.add(routePath)) {
+                    // New path discovered - add to results immediately
+                    SwingUtilities.invokeLater(() -> {
+                        addRouterPathToResults(routePath, resultId);
+                    });
+
+                    api.logging().logToOutput("Found router path (regex): " + routePath);
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error in regex route extraction: " + e.getMessage());
         }
     }
 
@@ -1346,13 +1456,8 @@ public class ActionsTab {
             api.logging().logToOutput("Retrieving sitemap entries...");
             List<HttpRequestResponse> sitemapItems = new ArrayList<>();
 
-            // Get all sitemap items (use proxy history as sitemap equivalent)
-            for (var proxyItem : api.proxy().history()) {
-                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
-                    proxyItem.finalRequest(),
-                    proxyItem.originalResponse()
-                ));
-            }
+            // Get all sitemap items (access actual sitemap, not just proxy history)
+            sitemapItems.addAll(api.siteMap().requestResponses());
 
             api.logging().logToOutput("Total sitemap items retrieved: " + sitemapItems.size());
 
@@ -1482,13 +1587,8 @@ public class ActionsTab {
             api.logging().logToOutput("Retrieving sitemap entries...");
             List<HttpRequestResponse> sitemapItems = new ArrayList<>();
 
-            // Get all sitemap items (use proxy history as sitemap equivalent)
-            for (var proxyItem : api.proxy().history()) {
-                sitemapItems.add(HttpRequestResponse.httpRequestResponse(
-                    proxyItem.finalRequest(),
-                    proxyItem.originalResponse()
-                ));
-            }
+            // Get all sitemap items (access actual sitemap, not just proxy history)
+            sitemapItems.addAll(api.siteMap().requestResponses());
 
             api.logging().logToOutput("Total sitemap items retrieved: " + sitemapItems.size());
 
