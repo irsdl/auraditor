@@ -202,6 +202,20 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
             }
 
         } catch (JsonProcessingException e) {
+            // TODO: Fix beautified JSON parsing issues in "message" parameter
+            // ISSUE: When users manually beautify JSON in the "message" parameter with proper formatting
+            //        (newlines, indentation), Jackson fails to parse it with errors like:
+            //        "Unexpected end-of-input: expected close marker for Object"
+            // ROOT CAUSE: The JSON minification logic in AuraTab.java doesn't always handle
+            //            complex multiline JSON structures correctly when they contain nested
+            //            objects, arrays, or escaped characters within form parameters
+            // IMPACT: Users cannot view/edit beautified JSON in Aura Actions tab
+            // WORKAROUND: Users must manually minify JSON or use single-line format
+            // FUTURE FIX: Implement robust multiline JSON detection and normalization that:
+            //            1. Properly handles nested braces and brackets in strings
+            //            2. Correctly processes escaped characters within JSON strings
+            //            3. Preserves JSON structure while removing formatting whitespace
+            //            4. Handles edge cases with mixed quote types and escaped sequences
             api.logging().logToError("JsonProcessingException in AuraActionsTab: " + e.getMessage());
             // Log the problematic JSON for debugging multiline issues
             if (jsonText.contains("\n") || jsonText.contains("\r")) {

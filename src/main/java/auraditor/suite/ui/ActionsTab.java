@@ -3393,6 +3393,8 @@ public class ActionsTab {
             api.logging().logToOutput("Operation cancelled by user - stopping all requests");
             operationCancelled = true; // Set cancellation flag immediately
             routerPathsCancelled = true; // Cancel router paths parsing if in progress
+            jsPathsCancelled = true; // Cancel JS paths parsing if in progress
+            descriptorsCancelled = true; // Cancel descriptors parsing if in progress
 
             // More aggressive thread stopping
             if (currentOperationThread != null && currentOperationThread.isAlive()) {

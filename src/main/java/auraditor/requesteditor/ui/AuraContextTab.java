@@ -160,6 +160,21 @@ public class AuraContextTab implements ExtensionProvidedHttpRequestEditor, Exten
             this.pane.add("Context", contextPanel);
 
         } catch (Exception e) {
+            // TODO: Fix beautified JSON parsing issues in "aura.context" parameter
+            // ISSUE: When users manually beautify JSON in the "aura.context" parameter with proper formatting
+            //        (newlines, indentation), the parsing logic fails with JsonProcessingException
+            // ROOT CAUSE: Similar to AuraActionsTab, the JSON normalization logic doesn't handle
+            //            complex multiline JSON structures correctly when they contain:
+            //            - Nested objects and arrays with formatting
+            //            - Mixed quote types and escaped characters
+            //            - Complex parameter encoding within form data
+            // IMPACT: Users cannot view/edit beautified aura.context JSON in Context tab
+            // WORKAROUND: Users must manually minify JSON or use single-line format
+            // FUTURE FIX: Implement same robust JSON normalization as mentioned in AuraActionsTab:
+            //            1. Enhanced multiline JSON detection and cleanup
+            //            2. Proper handling of URL-encoded parameters with complex JSON values
+            //            3. Better form parameter parsing for multiline content
+            //            4. Unified JSON processing across all Aura editor tabs
             api.logging().logToError("Exception in AuraContextTab requestSetup: " + e.getMessage());
             // Log the problematic JSON for debugging multiline issues
             if (contextJson.contains("\n") || contextJson.contains("\r")) {
