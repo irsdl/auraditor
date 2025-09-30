@@ -11,6 +11,7 @@ import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.requests.HttpRequest;
 import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.ui.swing.SwingUtils;
 import burp.api.montoya.proxy.ProxyHistoryFilter;
 import burp.api.montoya.proxy.ProxyHttpRequestResponse;
 import burp.api.montoya.core.HighlightColor;
@@ -459,7 +460,7 @@ public class BaseRequestsTab {
         // Confirm deletion if multiple requests selected
         if (selectedRows.length > 1) {
             int result = JOptionPane.showConfirmDialog(
-                mainPanel,
+                SwingUtils.suiteFrame(),
                 "Are you sure you want to delete " + selectedRows.length + " requests?",
                 "Confirm Deletion",
                 JOptionPane.YES_NO_OPTION,
@@ -613,7 +614,7 @@ public class BaseRequestsTab {
         // Confirm if there are multiple requests
         if (baseRequests.size() > 1) {
             int result = JOptionPane.showConfirmDialog(
-                mainPanel,
+                SwingUtils.suiteFrame(),
                 "Are you sure you want to clear all " + baseRequests.size() + " base requests?",
                 "Confirm Clear All",
                 JOptionPane.YES_NO_OPTION,

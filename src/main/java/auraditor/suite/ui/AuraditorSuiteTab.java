@@ -10,6 +10,7 @@ import auraditor.suite.BaseRequest;
 import auraditor.core.ThreadManager;
 import burp.api.montoya.MontoyaApi;
 import burp.api.montoya.http.message.HttpRequestResponse;
+import burp.api.montoya.ui.swing.SwingUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -597,7 +598,7 @@ public class AuraditorSuiteTab {
         SwingUtilities.invokeLater(() -> {
             // Show confirmation dialog
             int confirm = javax.swing.JOptionPane.showConfirmDialog(
-                mainPanel,
+                SwingUtils.suiteFrame(),
                 "Are you sure you want to delete the tab '" + tabTitle + "'?\nThis action cannot be undone.",
                 "Confirm Tab Deletion",
                 javax.swing.JOptionPane.YES_NO_OPTION,
