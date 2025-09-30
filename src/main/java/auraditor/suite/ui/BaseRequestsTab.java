@@ -460,7 +460,7 @@ public class BaseRequestsTab {
         // Confirm deletion if multiple requests selected
         if (selectedRows.length > 1) {
             int result = JOptionPane.showConfirmDialog(
-                SwingUtils.suiteFrame(),
+                api.userInterface().swingUtils().suiteFrame(),
                 "Are you sure you want to delete " + selectedRows.length + " requests?",
                 "Confirm Deletion",
                 JOptionPane.YES_NO_OPTION,
@@ -614,7 +614,7 @@ public class BaseRequestsTab {
         // Confirm if there are multiple requests
         if (baseRequests.size() > 1) {
             int result = JOptionPane.showConfirmDialog(
-                SwingUtils.suiteFrame(),
+                api.userInterface().swingUtils().suiteFrame(),
                 "Are you sure you want to clear all " + baseRequests.size() + " base requests?",
                 "Confirm Clear All",
                 JOptionPane.YES_NO_OPTION,

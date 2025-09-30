@@ -3352,7 +3352,7 @@ public class ActionsTab {
             fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
             fileChooser.setDialogTitle("Select Wordlist File");
             
-            int result = fileChooser.showOpenDialog(SwingUtils.suiteFrame());
+            int result = fileChooser.showOpenDialog(api.userInterface().swingUtils().suiteFrame());
             if (result == JFileChooser.APPROVE_OPTION) {
                 selectedWordlistFile = fileChooser.getSelectedFile();
                 // Show brief confirmation message (this will auto-clear)
@@ -4407,14 +4407,16 @@ public class ActionsTab {
         private final JList<String> categoryList;
         private final JTextArea objectListArea;
         private final JSplitPane splitPane;
+        private final MontoyaApi api;
 
         // Filter state (specific to DiscoveryResultPanel)
         private DefaultListModel<String> originalCategoryModel;
         private DefaultListModel<String> filteredCategoryModel;
         private String[] originalCategories;
         private boolean isFiltered = false;
-        
-        public DiscoveryResultPanel(DiscoveryResult discoveryResult) {
+
+        public DiscoveryResultPanel(DiscoveryResult discoveryResult, MontoyaApi api) {
+            this.api = api;
             this.discoveryResult = discoveryResult;
             this.setLayout(new BorderLayout());
             
@@ -4741,7 +4743,7 @@ public class ActionsTab {
 
             if (modelToExport.isEmpty()) {
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "No categories to export. Please ensure there are items in the list.",
                         "Nothing to Export",
                         javax.swing.JOptionPane.INFORMATION_MESSAGE);
@@ -4754,7 +4756,7 @@ public class ActionsTab {
             folderChooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
             folderChooser.setDialogTitle("Select Export Folder");
 
-            int result = folderChooser.showSaveDialog(SwingUtils.suiteFrame());
+            int result = folderChooser.showSaveDialog(api.userInterface().swingUtils().suiteFrame());
             if (result != javax.swing.JFileChooser.APPROVE_OPTION) {
                 return; // User cancelled
             }
@@ -4762,7 +4764,7 @@ public class ActionsTab {
             java.io.File exportFolder = folderChooser.getSelectedFile();
             if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Invalid folder selected for export.",
                         "Export Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -4804,7 +4806,7 @@ public class ActionsTab {
                     }
 
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Export completed successfully!\nFiles saved to: " + exportFolder.getAbsolutePath(),
                             "Export Successful",
                             javax.swing.JOptionPane.INFORMATION_MESSAGE);
@@ -4812,7 +4814,7 @@ public class ActionsTab {
 
                 } catch (Exception e) {
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Error during export: " + e.getMessage(),
                             "Export Error",
                             javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -4853,13 +4855,15 @@ public class ActionsTab {
         private final JList<String> categoryList;
         private final JTextArea routeListArea;
         private final JSplitPane splitPane;
+        private final MontoyaApi api;
 
         // Filter state
         private DefaultListModel<String> originalCategoryModel;
         private DefaultListModel<String> filteredCategoryModel;
         private boolean isFiltered = false;
 
-        public DiscoveredRoutesResultPanel(RouteDiscoveryResult routeDiscoveryResult) {
+        public DiscoveredRoutesResultPanel(RouteDiscoveryResult routeDiscoveryResult, MontoyaApi api) {
+            this.api = api;
             this.routeDiscoveryResult = routeDiscoveryResult != null ? routeDiscoveryResult : new RouteDiscoveryResult();
             this.setLayout(new BorderLayout());
 
@@ -5891,7 +5895,7 @@ public class ActionsTab {
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Could not extract request ID from object name",
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -5921,7 +5925,7 @@ public class ActionsTab {
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Could not extract request ID from object name",
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -5952,7 +5956,7 @@ public class ActionsTab {
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Could not extract request ID from object name",
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -5979,7 +5983,7 @@ public class ActionsTab {
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy request to clipboard: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Failed to copy request to clipboard: " + e.getMessage(),
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6028,7 +6032,7 @@ public class ActionsTab {
 
             api.logging().logToError("Could not find BaseRequest with ID: " + requestId);
             javax.swing.SwingUtilities.invokeLater(() -> {
-                javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                     "Could not find original request with ID: " + requestId,
                     "Error",
                     javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6184,7 +6188,7 @@ public class ActionsTab {
             } catch (Exception e) {
                 api.logging().logToError("Failed to send request to Repeater: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Failed to send request to Repeater: " + e.getMessage(),
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6201,7 +6205,7 @@ public class ActionsTab {
 
             if (modelToExport.isEmpty()) {
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "No objects to export. Please ensure there are items in the list.",
                         "Nothing to Export",
                         javax.swing.JOptionPane.INFORMATION_MESSAGE);
@@ -6214,7 +6218,7 @@ public class ActionsTab {
             folderChooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
             folderChooser.setDialogTitle("Select Export Folder");
 
-            int result = folderChooser.showSaveDialog(SwingUtils.suiteFrame());
+            int result = folderChooser.showSaveDialog(api.userInterface().swingUtils().suiteFrame());
             if (result != javax.swing.JFileChooser.APPROVE_OPTION) {
                 return; // User cancelled
             }
@@ -6222,7 +6226,7 @@ public class ActionsTab {
             java.io.File exportFolder = folderChooser.getSelectedFile();
             if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Invalid folder selected for export.",
                         "Export Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6259,7 +6263,7 @@ public class ActionsTab {
 
                     final int finalExportedCount = exportedCount;
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Successfully exported " + finalExportedCount + " objects to:\n" + exportFolder.getAbsolutePath(),
                             "Export Complete",
                             javax.swing.JOptionPane.INFORMATION_MESSAGE);
@@ -6269,7 +6273,7 @@ public class ActionsTab {
 
                 } catch (Exception e) {
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Failed to export objects: " + e.getMessage(),
                             "Export Error",
                             javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6512,14 +6516,14 @@ public class ActionsTab {
                     writer.write("Record ID: " + recordId + "\n\n");
                     writer.write(recordData);
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Record exported successfully to:\n" + outputFile.getAbsolutePath(),
                             "Export Complete",
                             javax.swing.JOptionPane.INFORMATION_MESSAGE);
                     });
                 } catch (Exception e) {
                     javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                             "Export failed: " + e.getMessage(),
                             "Export Error",
                             javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6602,7 +6606,7 @@ public class ActionsTab {
                 java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
 
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "HTTP request copied to clipboard",
                         "Copy Successful",
                         javax.swing.JOptionPane.INFORMATION_MESSAGE);
@@ -6610,7 +6614,7 @@ public class ActionsTab {
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy to clipboard: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Failed to copy to clipboard: " + e.getMessage(),
                         "Copy Failed",
                         javax.swing.JOptionPane.ERROR_MESSAGE);
@@ -6710,7 +6714,7 @@ public class ActionsTab {
             } catch (Exception e) {
                 api.logging().logToError("Failed to send to Repeater: " + e.getMessage());
                 javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(SwingUtils.suiteFrame(),
+                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
                         "Failed to send to Repeater: " + e.getMessage(),
                         "Error",
                         javax.swing.JOptionPane.ERROR_MESSAGE);

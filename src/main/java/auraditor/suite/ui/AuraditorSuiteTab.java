@@ -166,7 +166,7 @@ public class AuraditorSuiteTab {
             }
             
             // Create discovery result panel
-            ActionsTab.DiscoveryResultPanel discoveryPanel = new ActionsTab.DiscoveryResultPanel(discoveryResult);
+            ActionsTab.DiscoveryResultPanel discoveryPanel = new ActionsTab.DiscoveryResultPanel(discoveryResult, api);
             
             // Add the new result tab
             resultsTabbedPane.addTab(resultId, discoveryPanel);
@@ -191,7 +191,7 @@ public class AuraditorSuiteTab {
             }
 
             // Create discovered routes result panel
-            ActionsTab.DiscoveredRoutesResultPanel routesPanel = new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult);
+            ActionsTab.DiscoveredRoutesResultPanel routesPanel = new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult, api);
 
             // Add the new result tab
             resultsTabbedPane.addTab(resultId, routesPanel);
@@ -235,7 +235,7 @@ public class AuraditorSuiteTab {
             } else {
                 // Tab doesn't exist - create new tab
                 ActionsTab.DiscoveredRoutesResultPanel routesPanel =
-                    new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult);
+                    new ActionsTab.DiscoveredRoutesResultPanel(routeDiscoveryResult, api);
 
                 // Add the new result tab
                 resultsTabbedPane.addTab(resultId, routesPanel);
@@ -598,7 +598,7 @@ public class AuraditorSuiteTab {
         SwingUtilities.invokeLater(() -> {
             // Show confirmation dialog
             int confirm = javax.swing.JOptionPane.showConfirmDialog(
-                SwingUtils.suiteFrame(),
+                api.userInterface().swingUtils().suiteFrame(),
                 "Are you sure you want to delete the tab '" + tabTitle + "'?\nThis action cannot be undone.",
                 "Confirm Tab Deletion",
                 javax.swing.JOptionPane.YES_NO_OPTION,
