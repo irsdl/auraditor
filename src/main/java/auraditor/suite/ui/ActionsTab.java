@@ -1840,8 +1840,9 @@ public class ActionsTab {
                 String lwcDescriptor = controllerName + "." + methodName;
 
                 if (lwcDescriptor != null && discoveredDescriptors.add(lwcDescriptor)) {
-                    // Try to find parameters by searching for method invocations
-                    java.util.List<DescriptorInfo.ParameterInfo> parameters = findLWCParametersForMethod(responseBody, methodName);
+                    // Try to find parameters by searching for method invocations near the import
+                    int importIndex = lwcMatcher.start();
+                    java.util.List<DescriptorInfo.ParameterInfo> parameters = findLWCParametersForMethod(responseBody, methodName, importIndex);
 
                     // Create descriptor info with LWC format
                     DescriptorInfo descriptorInfo = new DescriptorInfo(lwcDescriptor, parameters, sourceUrl);
@@ -1907,18 +1908,58 @@ public class ActionsTab {
     }
 
     /**
-     * Find parameters for LWC Apex method
+     * Find parameters for LWC Apex method by searching for invocations near the import
      *
-     * NOTE: LWC imports from @salesforce/apex/ don't contain parameter information.
-     * Parameters would need to be extracted from method invocations in minified JS,
-     * which is unreliable and performance-intensive for large files (1-2MB).
-     *
-     * Instead, we return empty list and provide template-based output for users.
+     * Strategy: Search within proximity window around the import statement for method invocations
+     * like: methodName({ email: value, name: otherValue })
      */
-    private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName) {
-        // Return empty list - LWC imports don't contain parameter information
-        // Users will see helpful templates instead
-        return new java.util.ArrayList<>();
+    private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName, int importIndex) {
+        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+        java.util.Set<String> uniqueParamNames = new java.util.LinkedHashSet<>(); // Preserve order
+
+        try {
+            // Define proximity search window (search before and after import location)
+            int proximityWindow = 2000; // Search 2000 chars before and after import
+            int searchStart = Math.max(0, importIndex - proximityWindow);
+            int searchEnd = Math.min(responseBody.length(), importIndex + proximityWindow);
+            String searchRegion = responseBody.substring(searchStart, searchEnd);
+
+            // Pattern to match method invocation with object literal parameter:
+            // methodName({ paramName1: value1, paramName2: value2 })
+            // Also handles: methodName({paramName:value})
+            String patternStr = methodName + "\\s*\\(\\s*\\{([^}]+)\\}";
+            Pattern invocationPattern = Pattern.compile(patternStr);
+            Matcher matcher = invocationPattern.matcher(searchRegion);
+
+            if (matcher.find()) {
+                String paramsBlock = matcher.group(1); // Content between { and }
+
+                // Extract parameter names from the object literal
+                // Pattern: paramName: or paramName : or "paramName":
+                Pattern paramPattern = Pattern.compile("([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:");
+                Matcher paramMatcher = paramPattern.matcher(paramsBlock);
+
+                while (paramMatcher.find()) {
+                    String paramName = paramMatcher.group(1);
+
+                    // Filter out JavaScript keywords
+                    if (paramName != null &&
+                        !paramName.matches("^(this|self|that|return|function|class|const|let|var|if|else|for|while|switch|case|break|continue|new|try|catch|finally|throw|typeof|instanceof|void|delete|true|false|null|undefined|window|document|console|exports|module|require|import|default|then|catch|async|await|yield|from|as|of|in|do|with|debugger|super|extends|static|get|set)$")) {
+                        uniqueParamNames.add(paramName);
+                    }
+                }
+            }
+
+            // Convert to ParameterInfo objects
+            for (String paramName : uniqueParamNames) {
+                parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Error finding LWC parameters for method " + methodName + ": " + e.getMessage());
+        }
+
+        return parameters;
     }
 
     /**
@@ -1978,34 +2019,26 @@ public class ActionsTab {
      */
     private String generateLWCSampleCode(DescriptorInfo descriptorInfo) {
         try {
-            String descriptor = descriptorInfo.getDescriptor();
-            String[] parts = descriptor.split("\\.");
-            String methodName = parts.length > 1 ? parts[parts.length - 1] : "method";
-
             StringBuilder sample = new StringBuilder();
 
-            // Apex Method Signature Template
-            sample.append("=== Apex Method (Server-Side) ===\n");
-            sample.append("@AuraEnabled\n");
-            sample.append("public static ReturnType ").append(methodName).append("(ParameterType paramName) {\n");
-            sample.append("    // Implementation\n");
-            sample.append("}\n\n");
-
-            // LWC Import
-            sample.append("=== LWC Import (Client-Side) ===\n");
-            sample.append("import ").append(methodName);
-            sample.append(" from '@salesforce/apex/").append(descriptor).append("';\n\n");
-
-            // Sample Invocation
-            sample.append("=== Sample Invocation ===\n");
-            sample.append(methodName).append("({ paramName: value })\n");
-            sample.append("    .then(result => console.log(result))\n");
-            sample.append("    .catch(error => console.error(error));");
+            if (descriptorInfo.getParameters().isEmpty()) {
+                sample.append("{}");
+            } else {
+                sample.append("{");
+                for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
+                    DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
+                    if (i > 0) {
+                        sample.append(",");
+                    }
+                    sample.append("\"").append(param.getName()).append("\":\"sample\"");
+                }
+                sample.append("}");
+            }
 
             return sample.toString();
         } catch (Exception e) {
-            api.logging().logToError("Error generating LWC template: " + e.getMessage());
-            return "// Error generating template for: " + descriptorInfo.getDescriptor();
+            api.logging().logToError("Error generating LWC sample params: " + e.getMessage());
+            return "{}";
         }
     }
 
@@ -2071,7 +2104,7 @@ public class ActionsTab {
         if (isLWC) {
             listCategoryName = "LWC Apex Methods List (" + sessionTimestamp + ")";
             detailsCategoryName = "LWC Apex Methods Details (" + sessionTimestamp + ")";
-            sampleLabel = "Template";
+            sampleLabel = "Sample params";
         } else {
             listCategoryName = "Apex Descriptors List (Aura) (" + sessionTimestamp + ")";
             detailsCategoryName = "Apex Descriptors Details (Aura) (" + sessionTimestamp + ")";
@@ -2098,24 +2131,37 @@ public class ActionsTab {
             detailEntries = new java.util.ArrayList<>(detailEntries); // Create mutable copy
         }
 
-        // Format parameters for display as JSON array
+        // Format parameters for display
         String paramsDisplay;
         if (descriptorInfo.getParameters().isEmpty()) {
-            // For LWC, clarify that parameters are unknown (not absent)
-            paramsDisplay = isLWC ? "(Unknown - see template below)" : "No parameters";
+            paramsDisplay = isLWC ? "No parameters found" : "No parameters";
         } else {
-            StringBuilder paramsBuilder = new StringBuilder();
-            paramsBuilder.append("[");
-            for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
-                DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
-                if (i > 0) {
-                    paramsBuilder.append(",");
+            // For LWC: simple comma-separated list (e.g., "email, name")
+            // For Aura: JSON array format
+            if (isLWC) {
+                StringBuilder paramsBuilder = new StringBuilder();
+                for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
+                    DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
+                    if (i > 0) {
+                        paramsBuilder.append(", ");
+                    }
+                    paramsBuilder.append(param.getName());
                 }
-                paramsBuilder.append("{\"name\":\"").append(param.getName())
-                           .append("\",\"type\":\"").append(param.getType()).append("\"}");
+                paramsDisplay = paramsBuilder.toString();
+            } else {
+                StringBuilder paramsBuilder = new StringBuilder();
+                paramsBuilder.append("[");
+                for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
+                    DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
+                    if (i > 0) {
+                        paramsBuilder.append(",");
+                    }
+                    paramsBuilder.append("{\"name\":\"").append(param.getName())
+                               .append("\",\"type\":\"").append(param.getType()).append("\"}");
+                }
+                paramsBuilder.append("]");
+                paramsDisplay = paramsBuilder.toString();
             }
-            paramsBuilder.append("]");
-            paramsDisplay = paramsBuilder.toString();
         }
 
         // Generate sample message
