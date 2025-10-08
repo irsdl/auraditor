@@ -5166,13 +5166,11 @@ public class ActionsTab {
                 // Remove from route discovery result
                 routeDiscoveryResult.removeCategory(selectedCategory);
 
-                // Update UI
-                applyFilter();
+                // Update UI by rebuilding the list models from data
+                updateCategoryModels();
 
-                // Clear right panel if this was the selected category
-                if (selectedCategory.equals(categoryList.getSelectedValue())) {
-                    routeListArea.setText("");
-                }
+                // Clear right panel since the category was deleted
+                routeListArea.setText("");
             }
         }
 
@@ -5665,13 +5663,12 @@ public class ActionsTab {
                 objectByNameResult.removeObject(selectedObject);
                 currentObjectData.remove(selectedObject);
 
-                // Update UI
-                applyFilter();
+                // Remove from both list models
+                originalObjectModel.removeElement(selectedObject);
+                filteredObjectModel.removeElement(selectedObject);
 
-                // Clear right panel if this was the selected object
-                if (selectedObject.equals(objectList.getSelectedValue())) {
-                    jsonDataArea.setText("");
-                }
+                // Clear right panel since the object was deleted
+                jsonDataArea.setText("");
             }
         }
 
