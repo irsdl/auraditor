@@ -393,7 +393,24 @@ public class BaseRequestsTab {
     
     private void setupRequestViewer() {
         // Add the native Burp HTTP request editor component
-        requestViewerPanel.add(requestEditor.uiComponent(), BorderLayout.CENTER);
+        Component editorComponent = requestEditor.uiComponent();
+        requestViewerPanel.add(editorComponent, BorderLayout.CENTER);
+
+        // Make the editor read-only by disabling the component
+        // Users should use Repeater for modifications and "Send to Auraditor" to add edited requests
+        setComponentEnabled(editorComponent, false);
+    }
+
+    /**
+     * Recursively disable/enable a component and all its children
+     */
+    private void setComponentEnabled(Component component, boolean enabled) {
+        component.setEnabled(enabled);
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                setComponentEnabled(child, enabled);
+            }
+        }
     }
     
     private void showRequestDetails(BaseRequest baseRequest) {
