@@ -5006,7 +5006,7 @@ public class ActionsTab {
 
         private void updateCategoryModels() {
             // Save current selection to preserve it after rebuild
-            String currentSelection = categoryList.getSelectedValue();
+            String currentSelection = categoryList != null ? categoryList.getSelectedValue() : null;
 
             originalCategoryModel.clear();
             filteredCategoryModel.clear();
@@ -5017,13 +5017,16 @@ public class ActionsTab {
             }
 
             // Restore selection if it still exists in the updated model
-            if (currentSelection != null) {
+            if (currentSelection != null && categoryList != null) {
                 for (int i = 0; i < filteredCategoryModel.getSize(); i++) {
                     if (filteredCategoryModel.get(i).equals(currentSelection)) {
                         categoryList.setSelectedIndex(i);
                         break;
                     }
                 }
+            } else if (categoryList != null && filteredCategoryModel.getSize() > 0 && categoryList.getSelectedIndex() == -1) {
+                // No previous selection and items exist - select first item
+                categoryList.setSelectedIndex(0);
             }
         }
 
