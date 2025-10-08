@@ -5296,9 +5296,21 @@ public class ActionsTab {
         protected void highlightCurrentMatch() {
             if (searchMatches.isEmpty() || currentSearchIndex < 0) return;
 
-            int position = searchMatches.get(currentSearchIndex);
-            routeListArea.setCaretPosition(position);
+            int start = searchMatches.get(currentSearchIndex);
+            String searchText = searchField.getText();
+            int length = searchText.length();
+
+            routeListArea.setSelectionStart(start);
+            routeListArea.setSelectionEnd(start + length);
+            routeListArea.getCaret().setSelectionVisible(true);
             routeListArea.requestFocus();
+
+            // Scroll to make selection visible
+            try {
+                routeListArea.scrollRectToVisible(routeListArea.modelToView2D(start).getBounds());
+            } catch (Exception e) {
+                // Ignore scrolling errors
+            }
         }
 
         @Override
@@ -5777,10 +5789,18 @@ public class ActionsTab {
             if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
                 int matchStart = searchMatches.get(currentSearchIndex);
                 int matchEnd = matchStart + searchField.getText().length();
-                
+
                 jsonDataArea.setSelectionStart(matchStart);
                 jsonDataArea.setSelectionEnd(matchEnd);
+                jsonDataArea.getCaret().setSelectionVisible(true);
                 jsonDataArea.requestFocus();
+
+                // Scroll to make selection visible
+                try {
+                    jsonDataArea.scrollRectToVisible(jsonDataArea.modelToView2D(matchStart).getBounds());
+                } catch (Exception e) {
+                    // Ignore scrolling errors
+                }
             }
         }
         
@@ -6590,9 +6610,18 @@ public class ActionsTab {
             if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
                 int matchStart = searchMatches.get(currentSearchIndex);
                 int matchEnd = matchStart + searchField.getText().length();
+
                 dataArea.setSelectionStart(matchStart);
                 dataArea.setSelectionEnd(matchEnd);
+                dataArea.getCaret().setSelectionVisible(true);
                 dataArea.requestFocus();
+
+                // Scroll to make selection visible
+                try {
+                    dataArea.scrollRectToVisible(dataArea.modelToView2D(matchStart).getBounds());
+                } catch (Exception e) {
+                    // Ignore scrolling errors
+                }
             }
         }
 
