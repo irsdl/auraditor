@@ -1907,64 +1907,49 @@ public class ActionsTab {
     }
 
     /**
-     * Find parameters for LWC Apex method by analyzing method invocations in JavaScript
-     * This searches for the import variable name and then finds invocations of that variable
+     * Find parameters for LWC Apex method by searching for the @AuraEnabled parameters
+     * Since LWC parameters aren't always visible in minified JS, we extract from invocations
      */
     private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName) {
         java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
         java.util.Set<String> uniqueParamNames = new java.util.HashSet<>();
 
         try {
-            // Step 1: Find how this method is imported (what variable name it's assigned to)
-            // Pattern: import methodName from '@salesforce/apex/...'
-            // or in the imports array: "methodName":"apexMethod"
-            // In minified code it might be: import X from '@salesforce...'
-
-            // Look for import statements in the module definition
-            // Pattern: ["@salesforce/apex/Controller.methodName",...] then function(e,a,t,i,n,...)
-            // where the position in the import array corresponds to the parameter position
-
-            // Simpler approach: Search for ALL object parameter patterns and collect unique param names
-            // Since we're analyzing the same file that has the import, params used are likely relevant
-
             // Skip if response body is too large to prevent performance issues
             if (responseBody.length() > 500000) {
-                api.logging().logToOutput("Skipping parameter extraction for large file (>" + responseBody.length() + " chars)");
                 return parameters;
             }
 
-            // Pattern matches: .default({params}) or variable({params}) anywhere in the code
-            // Limit capture group size to prevent catastrophic backtracking
-            Pattern invocationPattern = Pattern.compile(
-                "(?:\\w+\\.default|\\w+)\\s*\\(\\s*\\{([^}]{1,200})\\}\\s*\\)",
+            // Strategy: Look for object literal patterns with parameter names
+            // Examples from minified code: {email:t.email}, {record:i,accountRecordType:n}
+            // Pattern: {paramName:value,paramName2:value2}
+
+            Pattern paramObjectPattern = Pattern.compile(
+                "\\{\\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:",
                 Pattern.CASE_INSENSITIVE
             );
 
-            Matcher invocationMatcher = invocationPattern.matcher(responseBody);
-            int maxMatches = 20; // Reduced limit to prevent excessive processing
+            Matcher matcher = paramObjectPattern.matcher(responseBody);
             int matchCount = 0;
+            int maxMatches = 100; // Check more patterns but still limit
 
-            while (invocationMatcher.find() && matchCount < maxMatches) {
+            while (matcher.find() && matchCount < maxMatches) {
                 matchCount++;
-                String paramsBlock = invocationMatcher.group(1);
+                String paramName = matcher.group(1);
 
-                if (paramsBlock != null && !paramsBlock.isEmpty()) {
-                    // Extract parameter names from the object literal
-                    // Matches: paramName: or paramName, or "paramName":
-                    Matcher paramNameMatcher = LWC_PARAM_PATTERN.matcher(paramsBlock);
-                    while (paramNameMatcher.find()) {
-                        String paramName = paramNameMatcher.group(1);
-                        if (paramName != null && paramName.length() > 0 && paramName.length() < 50) {
-                            // Filter out common JavaScript keywords that aren't parameters
-                            if (!paramName.matches("^(this|return|function|class|const|let|var|if|else|for|while)$")) {
-                                uniqueParamNames.add(paramName);
-                            }
-                        }
-                    }
+                // Filter out JavaScript keywords, built-ins, and very short names
+                if (paramName != null &&
+                    paramName.length() >= 3 &&
+                    paramName.length() <= 40 &&
+                    !paramName.matches("^(this|self|that|return|function|class|const|let|var|if|else|for|while|switch|case|break|continue|new|try|catch|finally|throw|typeof|instanceof|void|delete|true|false|null|undefined|window|document|console|exports|module|require|import|default|then|catch|async|await|yield|from|as|of|in|do|with|debugger|super|extends|static|get|set)$") &&
+                    // Check if it looks like a reasonable parameter name (not minified single letters mixed with common patterns)
+                    (paramName.length() > 3 || paramName.matches("^(id|key|url|uri|api|src|alt|obj)$"))) {
+                    uniqueParamNames.add(paramName);
                 }
             }
 
-            // Convert unique param names to ParameterInfo objects
+            // Convert to ParameterInfo objects
+            // Since we don't have type information in LWC JS, use "Object" as generic type
             for (String paramName : uniqueParamNames) {
                 parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
             }
@@ -2041,16 +2026,13 @@ public class ActionsTab {
             StringBuilder sample = new StringBuilder();
 
             // Import statement
-            sample.append("// Import the Apex method\n");
             sample.append("import ").append(methodName);
             sample.append(" from '@salesforce/apex/").append(descriptor).append("';\n\n");
 
             // Method invocation example
-            sample.append("// Call the method\n");
             sample.append(methodName).append("({\n");
 
             if (descriptorInfo.getParameters().isEmpty()) {
-                // No parameters
                 sample.append("    // No parameters\n");
             } else {
                 // Add parameters
@@ -2066,14 +2048,8 @@ public class ActionsTab {
             }
 
             sample.append("})\n");
-            sample.append(".then(result => {\n");
-            sample.append("    // Handle success\n");
-            sample.append("    console.log('Success:', result);\n");
-            sample.append("})\n");
-            sample.append(".catch(error => {\n");
-            sample.append("    // Handle error\n");
-            sample.append("    console.error('Error:', error);\n");
-            sample.append("});");
+            sample.append(".then(result => console.log(result))\n");
+            sample.append(".catch(error => console.error(error));");
 
             return sample.toString();
         } catch (Exception e) {
