@@ -4388,6 +4388,49 @@ public class ActionsTab {
             }
         }
 
+        /**
+         * Add word wrap toggle context menu to a JTextArea
+         * Word wrap is enabled by default
+         */
+        protected void addWordWrapContextMenu(JTextArea textArea) {
+            // Enable word wrap by default
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+
+            // Create context menu
+            JPopupMenu contextMenu = new JPopupMenu();
+            JCheckBoxMenuItem wordWrapItem = new JCheckBoxMenuItem("Word Wrap", true);
+
+            wordWrapItem.addActionListener(e -> {
+                boolean wrap = wordWrapItem.isSelected();
+                textArea.setLineWrap(wrap);
+                textArea.setWrapStyleWord(wrap);
+            });
+
+            contextMenu.add(wordWrapItem);
+
+            // Add mouse listener for right-click
+            textArea.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showMenu(e);
+                    }
+                }
+
+                @Override
+                public void mouseReleased(java.awt.event.MouseEvent e) {
+                    if (e.isPopupTrigger()) {
+                        showMenu(e);
+                    }
+                }
+
+                private void showMenu(java.awt.event.MouseEvent e) {
+                    contextMenu.show(e.getComponent(), e.getX(), e.getY());
+                }
+            });
+        }
+
         // Abstract methods that subclasses must implement
         protected abstract void performSearch();
         protected abstract void applyFilter();
@@ -4448,7 +4491,10 @@ public class ActionsTab {
             this.objectListArea = new JTextArea();
             objectListArea.setEditable(false);
             objectListArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-            
+
+            // Add word wrap context menu (enabled by default)
+            addWordWrapContextMenu(objectListArea);
+
             // Add selection listener to update object list
             categoryList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
@@ -4882,8 +4928,9 @@ public class ActionsTab {
             // Create route display area
             this.routeListArea = new JTextArea();
             this.routeListArea.setEditable(false);
-            this.routeListArea.setLineWrap(false); // Don't wrap URLs
-            this.routeListArea.setWrapStyleWord(false);
+
+            // Add word wrap context menu (enabled by default)
+            addWordWrapContextMenu(routeListArea);
 
             // Create shared toolbar
             JPanel toolbarPanel = createSharedToolbar();
@@ -5337,7 +5384,10 @@ public class ActionsTab {
             this.jsonDataArea = new JTextArea();
             jsonDataArea.setEditable(false);
             jsonDataArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-            
+
+            // Add word wrap context menu (enabled by default)
+            addWordWrapContextMenu(jsonDataArea);
+
             // Add selection listener to update JSON data
             objectList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
@@ -6362,6 +6412,9 @@ public class ActionsTab {
             this.dataArea = new JTextArea(recordData);
             dataArea.setEditable(false);
             dataArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+
+            // Add word wrap context menu (enabled by default)
+            addWordWrapContextMenu(dataArea);
 
             // Create split pane
             JScrollPane recordScrollPane = new JScrollPane(recordList);
