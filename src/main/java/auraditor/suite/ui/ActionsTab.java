@@ -1832,20 +1832,16 @@ public class ActionsTab {
                 }
             }
 
-            // Third pass: Find LWC-style Apex imports
-            Matcher lwcMatcher = LWC_IMPORT_PATTERN.matcher(responseBody);
-            while (lwcMatcher.find()) {
-                String controllerName = lwcMatcher.group(1);
-                String methodName = lwcMatcher.group(2);
-                String lwcDescriptor = controllerName + "." + methodName;
+            // Third pass: Find LWC-style Apex methods using module-based extraction
+            // This parses the entire $A.componentService.addModule(...) structure to properly
+            // map dependencies → factory parameters → aliases → method calls
+            java.util.List<LWCApexMethod> lwcMethods = extractLWCMethodsFromModules(responseBody);
+            for (LWCApexMethod method : lwcMethods) {
+                String lwcDescriptor = method.controller + "." + method.methodName;
 
-                if (lwcDescriptor != null && discoveredDescriptors.add(lwcDescriptor)) {
-                    // Try to find parameters by searching for method invocations near the import
-                    int importIndex = lwcMatcher.start();
-                    java.util.List<DescriptorInfo.ParameterInfo> parameters = findLWCParametersForMethod(responseBody, methodName, importIndex);
-
-                    // Create descriptor info with LWC format
-                    DescriptorInfo descriptorInfo = new DescriptorInfo(lwcDescriptor, parameters, sourceUrl);
+                if (discoveredDescriptors.add(lwcDescriptor)) {
+                    // Create descriptor info with extracted parameters
+                    DescriptorInfo descriptorInfo = new DescriptorInfo(lwcDescriptor, method.parameters, sourceUrl);
                     addDescriptorToResults(descriptorInfo, sessionTimestamp);
                 }
             }
@@ -1908,58 +1904,241 @@ public class ActionsTab {
     }
 
     /**
-     * Find parameters for LWC Apex method by searching for invocations near the import
-     *
-     * Strategy: Search within proximity window around the import statement for method invocations
-     * like: methodName({ email: value, name: otherValue })
+     * Helper class to represent an LWC Apex method with its parameters
      */
-    private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName, int importIndex) {
-        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
-        java.util.Set<String> uniqueParamNames = new java.util.LinkedHashSet<>(); // Preserve order
+    private static class LWCApexMethod {
+        String controller;
+        String methodName;
+        java.util.List<DescriptorInfo.ParameterInfo> parameters;
+
+        LWCApexMethod(String controller, String methodName, java.util.List<DescriptorInfo.ParameterInfo> parameters) {
+            this.controller = controller;
+            this.methodName = methodName;
+            this.parameters = parameters;
+        }
+    }
+
+    /**
+     * Helper class for tracking Apex dependencies within a module
+     */
+    private static class ApexDependency {
+        int index;
+        String controller;
+        String methodName;
+        String factoryParam;
+    }
+
+    /**
+     * Extract LWC Apex methods from JavaScript modules
+     * This parses $A.componentService.addModule() calls and extracts:
+     * 1. Dependencies array → factory parameters mapping
+     * 2. Alias tracking (e.g., N=y(s))
+     * 3. Method invocations (e.g., N.default({email:x}))
+     */
+    private java.util.List<LWCApexMethod> extractLWCMethodsFromModules(String jsContent) {
+        java.util.List<LWCApexMethod> results = new java.util.ArrayList<>();
 
         try {
-            // Define proximity search window (search before and after import location)
-            int proximityWindow = 2000; // Search 2000 chars before and after import
-            int searchStart = Math.max(0, importIndex - proximityWindow);
-            int searchEnd = Math.min(responseBody.length(), importIndex + proximityWindow);
-            String searchRegion = responseBody.substring(searchStart, searchEnd);
+            // Pattern: $A.componentService.addModule('markup://...', \"path\",[deps],function(params){
+            Pattern modulePattern = Pattern.compile(
+                "\\$A\\.componentService\\.addModule\\('[^']+',\\s*\\\\\"([^\\\\\"]+)\\\\\"\\s*,\\s*(\\[[\\s\\S]*?\\])\\s*,\\s*function\\s*\\(([^)]*)\\)\\s*\\{",
+                Pattern.DOTALL
+            );
 
-            // Pattern to match method invocation with object literal parameter:
-            // methodName({ paramName1: value1, paramName2: value2 })
-            // Also handles: methodName({paramName:value})
-            String patternStr = methodName + "\\s*\\(\\s*\\{([^}]+)\\}";
-            Pattern invocationPattern = Pattern.compile(patternStr);
-            Matcher matcher = invocationPattern.matcher(searchRegion);
+            Matcher moduleMatcher = modulePattern.matcher(jsContent);
 
-            if (matcher.find()) {
-                String paramsBlock = matcher.group(1); // Content between { and }
+            while (moduleMatcher.find()) {
+                String modulePath = moduleMatcher.group(1);
+                String depsArrayText = moduleMatcher.group(2);
+                String factoryParamsText = moduleMatcher.group(3);
 
-                // Extract parameter names from the object literal
-                // Pattern: paramName: or paramName : or "paramName":
-                Pattern paramPattern = Pattern.compile("([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:");
-                Matcher paramMatcher = paramPattern.matcher(paramsBlock);
+                // Extract factory body
+                int bodyStart = moduleMatcher.end();
+                int bodyEnd = findMatchingBrace(jsContent, bodyStart - 1);
+                if (bodyEnd == -1) continue;
 
-                while (paramMatcher.find()) {
-                    String paramName = paramMatcher.group(1);
+                String factoryBody = jsContent.substring(bodyStart, bodyEnd);
 
-                    // Filter out JavaScript keywords
-                    if (paramName != null &&
-                        !paramName.matches("^(this|self|that|return|function|class|const|let|var|if|else|for|while|switch|case|break|continue|new|try|catch|finally|throw|typeof|instanceof|void|delete|true|false|null|undefined|window|document|console|exports|module|require|import|default|then|catch|async|await|yield|from|as|of|in|do|with|debugger|super|extends|static|get|set)$")) {
-                        uniqueParamNames.add(paramName);
+                // Only process LWC modules (c/... paths)
+                if (!modulePath.startsWith("c/")) {
+                    continue;
+                }
+
+                // Extract dependencies and factory parameters
+                java.util.List<String> deps = extractDepsArrayInOrder(depsArrayText);
+                java.util.List<String> factoryParams = extractFactoryParameters(factoryParamsText);
+
+                // Find Apex dependencies
+                java.util.List<ApexDependency> apexDeps = new java.util.ArrayList<>();
+                Pattern apexPattern = Pattern.compile("^@salesforce/apex/([\\w$]+)\\.([\\w$]+)$");
+
+                for (int i = 0; i < deps.size(); i++) {
+                    Matcher apexMatcher = apexPattern.matcher(deps.get(i));
+                    if (apexMatcher.matches()) {
+                        ApexDependency apexDep = new ApexDependency();
+                        apexDep.index = i;
+                        apexDep.controller = apexMatcher.group(1);
+                        apexDep.methodName = apexMatcher.group(2);
+                        apexDep.factoryParam = i < factoryParams.size() ? factoryParams.get(i) : null;
+                        apexDeps.add(apexDep);
                     }
+                }
+
+                // Build alias map (e.g., N=y(s), C=y(l))
+                java.util.Map<String, java.util.Set<String>> aliasMap = buildLWCAliasMap(factoryBody);
+
+                // For each Apex dependency, find method calls and extract parameters
+                for (ApexDependency apexDep : apexDeps) {
+                    if (apexDep.factoryParam == null) continue;
+
+                    // Collect all identifiers (factory param + aliases)
+                    java.util.Set<String> identifiers = new java.util.LinkedHashSet<>();
+                    identifiers.add(apexDep.factoryParam);
+                    if (aliasMap.containsKey(apexDep.factoryParam)) {
+                        identifiers.addAll(aliasMap.get(apexDep.factoryParam));
+                    }
+
+                    // Find all method calls and extract parameter names
+                    java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+                    for (String identifier : identifiers) {
+                        java.util.List<String> params = findLWCCallParameters(factoryBody, identifier);
+                        paramNames.addAll(params);
+                    }
+
+                    // Create ParameterInfo objects
+                    java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+                    for (String paramName : paramNames) {
+                        parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
+                    }
+
+                    results.add(new LWCApexMethod(apexDep.controller, apexDep.methodName, parameters));
                 }
             }
 
-            // Convert to ParameterInfo objects
-            for (String paramName : uniqueParamNames) {
-                parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
-            }
-
         } catch (Exception e) {
-            api.logging().logToError("Error finding LWC parameters for method " + methodName + ": " + e.getMessage());
+            api.logging().logToError("Error extracting LWC methods from modules: " + e.getMessage());
         }
 
-        return parameters;
+        return results;
+    }
+
+    /**
+     * Find matching closing brace for a given opening brace position
+     */
+    private int findMatchingBrace(String text, int openPos) {
+        int depth = 1;
+        for (int i = openPos + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Extract dependencies from array text, preserving order
+     * Handles escaped quotes in JSON: [\"dep1\",\"dep2\"]
+     */
+    private java.util.List<String> extractDepsArrayInOrder(String depsArrayText) {
+        java.util.List<String> deps = new java.util.ArrayList<>();
+        Pattern stringPattern = Pattern.compile("\\\\\"([^\\\\\"]*?)\\\\\"");
+        Matcher matcher = stringPattern.matcher(depsArrayText);
+
+        while (matcher.find()) {
+            String dep = matcher.group(1);
+            deps.add(dep);
+        }
+
+        return deps;
+    }
+
+    /**
+     * Extract factory function parameters from comma-separated list
+     */
+    private java.util.List<String> extractFactoryParameters(String paramsText) {
+        java.util.List<String> params = new java.util.ArrayList<>();
+        if (paramsText == null || paramsText.trim().isEmpty()) {
+            return params;
+        }
+
+        String[] parts = paramsText.split(",");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                params.add(trimmed);
+            }
+        }
+        return params;
+    }
+
+    /**
+     * Build alias map tracking variable assignments
+     * Handles patterns like: N=y(s), C=y(l) (wrapper aliases)
+     */
+    private java.util.Map<String, java.util.Set<String>> buildLWCAliasMap(String body) {
+        java.util.Map<String, java.util.Set<String>> aliasMap = new java.util.HashMap<>();
+
+        // Pattern for wrapper aliases: N=y(s)
+        Pattern wrapperPattern = Pattern.compile("([A-Za-z_$][\\w$]*)\\s*=\\s*y\\(\\s*([A-Za-z_$][\\w$]*)\\s*\\)");
+        Matcher wrapperMatcher = wrapperPattern.matcher(body);
+        while (wrapperMatcher.find()) {
+            String alias = wrapperMatcher.group(1);
+            String source = wrapperMatcher.group(2);
+            aliasMap.computeIfAbsent(source, k -> new java.util.LinkedHashSet<>()).add(alias);
+        }
+
+        return aliasMap;
+    }
+
+    /**
+     * Find parameter names from method calls like: identifier.default({email:x, name:y})
+     */
+    private java.util.List<String> findLWCCallParameters(String body, String identifier) {
+        java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+
+        try {
+            String escapedId = identifier.replace("$", "\\$");
+            String patternStr = "\\b" + escapedId + "\\.default\\s*\\(\\s*\\{([^}]*)\\}";
+            Pattern callPattern = Pattern.compile(patternStr);
+            Matcher callMatcher = callPattern.matcher(body);
+
+            while (callMatcher.find()) {
+                String objectLiteral = callMatcher.group(1);
+
+                Pattern keyPattern = Pattern.compile("([A-Za-z_$][\\w$]*)\\s*:");
+                Matcher keyMatcher = keyPattern.matcher(objectLiteral);
+
+                while (keyMatcher.find()) {
+                    String paramName = keyMatcher.group(1);
+                    if (!isJavaScriptKeyword(paramName)) {
+                        paramNames.add(paramName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error finding calls for identifier '" + identifier + "': " + e.getMessage());
+        }
+
+        return new java.util.ArrayList<>(paramNames);
+    }
+
+    /**
+     * Check if a name is a JavaScript keyword
+     */
+    private boolean isJavaScriptKeyword(String name) {
+        java.util.Set<String> keywords = new java.util.HashSet<>(java.util.Arrays.asList(
+            "this", "self", "that", "return", "function", "class", "const", "let", "var",
+            "if", "else", "for", "while", "switch", "case", "break", "continue", "new",
+            "try", "catch", "finally", "throw", "typeof", "instanceof", "void", "delete",
+            "true", "false", "null", "undefined", "window", "document", "console",
+            "exports", "module", "require", "import", "default", "then", "catch",
+            "async", "await", "yield", "from", "as", "of", "in", "do", "with",
+            "debugger", "super", "extends", "static", "get", "set"
+        ));
+        return keywords.contains(name);
     }
 
     /**
