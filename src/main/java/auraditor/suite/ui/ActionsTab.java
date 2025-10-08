@@ -478,6 +478,18 @@ public class ActionsTab {
         "\\{\\s*\"name\"\\s*:\\s*\"([^\"]+)\"\\s*,\\s*\"type\"\\s*:\\s*\"([^\"]+)\"\\s*\\}",
         Pattern.CASE_INSENSITIVE
     );
+
+    // LWC-specific patterns for Apex method imports and parameters
+    private static final Pattern LWC_IMPORT_PATTERN = Pattern.compile(
+        "@salesforce/apex/([\\w\\._\\-$]+)\\.([\\w\\._\\-$]+)",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern LWC_PARAM_PATTERN = Pattern.compile(
+        "\\{\\s*([\\w_]+)\\s*:",
+        Pattern.CASE_INSENSITIVE
+    );
+
     private static final Pattern ROUTES_PATTERN = Pattern.compile(
         "\"routes\":\\s*\\{([^{}]*(?:\\{[^{}]*\\}[^{}]*)*)\\}",
         Pattern.CASE_INSENSITIVE
@@ -699,7 +711,7 @@ public class ActionsTab {
         actionsPanel.add(getPotentialPathsFromJSBtn, gbc);
 
         gbc.gridy++; gbc.gridwidth = 1; gbc.gridx = 0;
-        findDescriptorsFromSitemapBtn.setToolTipText("Extract Apex descriptors from JavaScript files in sitemap (passive)");
+        findDescriptorsFromSitemapBtn.setToolTipText("Extract Apex descriptors (Aura) and methods (LWC) from JavaScript files in sitemap (passive)");
         findDescriptorsFromSitemapBtn.setEnabled(true); // Passive buttons enabled by default (no baseline request needed)
         actionsPanel.add(findDescriptorsFromSitemapBtn, gbc);
 
@@ -1820,6 +1832,23 @@ public class ActionsTab {
                 }
             }
 
+            // Third pass: Find LWC-style Apex imports
+            Matcher lwcMatcher = LWC_IMPORT_PATTERN.matcher(responseBody);
+            while (lwcMatcher.find()) {
+                String controllerName = lwcMatcher.group(1);
+                String methodName = lwcMatcher.group(2);
+                String lwcDescriptor = controllerName + "." + methodName;
+
+                if (lwcDescriptor != null && discoveredDescriptors.add(lwcDescriptor)) {
+                    // Try to find parameters by searching for method invocations
+                    java.util.List<DescriptorInfo.ParameterInfo> parameters = findLWCParametersForMethod(responseBody, methodName);
+
+                    // Create descriptor info with LWC format
+                    DescriptorInfo descriptorInfo = new DescriptorInfo(lwcDescriptor, parameters, sourceUrl);
+                    addDescriptorToResults(descriptorInfo, sessionTimestamp);
+                }
+            }
+
         } catch (Exception e) {
             api.logging().logToError("Exception processing JavaScript response for descriptors: " + e.getMessage());
         }
@@ -1878,6 +1907,54 @@ public class ActionsTab {
     }
 
     /**
+     * Find parameters for LWC Apex method by analyzing method invocations in JavaScript
+     */
+    private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName) {
+        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
+        java.util.Set<String> uniqueParamNames = new java.util.HashSet<>();
+
+        try {
+            // Look for method invocations with various patterns
+            // Pattern 1: methodName({param1:..., param2:...})
+            // Pattern 2: variableName({param1:..., param2:...}) where variableName is imported as methodName
+
+            // Create pattern to find function calls with object parameter
+            // This matches: identifier({...}) or identifier.default({...})
+            String escapedMethod = Pattern.quote(methodName);
+            Pattern invocationPattern = Pattern.compile(
+                "\\w+\\.default\\s*\\(\\s*\\{([^}]+)\\}\\s*\\)|" +
+                "\\w+\\s*\\(\\s*\\{([^}]+)\\}\\s*\\)",
+                Pattern.CASE_INSENSITIVE
+            );
+
+            Matcher invocationMatcher = invocationPattern.matcher(responseBody);
+            while (invocationMatcher.find()) {
+                String paramsBlock = invocationMatcher.group(1);
+                if (paramsBlock == null) {
+                    paramsBlock = invocationMatcher.group(2);
+                }
+
+                if (paramsBlock != null) {
+                    // Extract parameter names from the object literal
+                    Matcher paramNameMatcher = LWC_PARAM_PATTERN.matcher(paramsBlock);
+                    while (paramNameMatcher.find()) {
+                        String paramName = paramNameMatcher.group(1);
+                        if (paramName != null && uniqueParamNames.add(paramName)) {
+                            // For LWC, we don't have explicit type information, so default to String
+                            parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Error finding LWC parameters for method " + methodName + ": " + e.getMessage());
+        }
+
+        return parameters;
+    }
+
+    /**
      * Parse parameter definitions from JSON parameter array
      */
     private java.util.List<DescriptorInfo.ParameterInfo> parseParametersFromJson(String parameterArrayJson) {
@@ -1930,10 +2007,73 @@ public class ActionsTab {
     }
 
     /**
-     * Generate sample message JSON for the descriptor
+     * Generate LWC JavaScript sample code for calling an Apex method
+     */
+    private String generateLWCSampleCode(DescriptorInfo descriptorInfo) {
+        try {
+            String descriptor = descriptorInfo.getDescriptor();
+            String[] parts = descriptor.split("\\.");
+            String controllerName = parts.length > 0 ? descriptor : "Controller";
+            String methodName = parts.length > 1 ? parts[parts.length - 1] : "method";
+
+            StringBuilder sample = new StringBuilder();
+
+            // Import statement
+            sample.append("// Import the Apex method\n");
+            sample.append("import ").append(methodName);
+            sample.append(" from '@salesforce/apex/").append(descriptor).append("';\n\n");
+
+            // Method invocation example
+            sample.append("// Call the method\n");
+            sample.append(methodName).append("({\n");
+
+            if (descriptorInfo.getParameters().isEmpty()) {
+                // No parameters
+                sample.append("    // No parameters\n");
+            } else {
+                // Add parameters
+                for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
+                    DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
+                    if (i > 0) {
+                        sample.append(",\n");
+                    }
+                    sample.append("    ").append(param.getName()).append(": ");
+                    sample.append(generateSampleValue(param.getType()));
+                }
+                sample.append("\n");
+            }
+
+            sample.append("})\n");
+            sample.append(".then(result => {\n");
+            sample.append("    // Handle success\n");
+            sample.append("    console.log('Success:', result);\n");
+            sample.append("})\n");
+            sample.append(".catch(error => {\n");
+            sample.append("    // Handle error\n");
+            sample.append("    console.error('Error:', error);\n");
+            sample.append("});");
+
+            return sample.toString();
+        } catch (Exception e) {
+            api.logging().logToError("Error generating LWC sample code: " + e.getMessage());
+            return "// Error generating sample code for: " + descriptorInfo.getDescriptor();
+        }
+    }
+
+    /**
+     * Generate sample message/code for the descriptor (Aura or LWC)
      */
     private String generateSampleMessage(DescriptorInfo descriptorInfo) {
         try {
+            String descriptor = descriptorInfo.getDescriptor();
+
+            // Check if it's LWC format (ControllerName.methodName) vs Aura (apex://...)
+            if (!descriptor.startsWith("apex://")) {
+                // Generate LWC-style sample code
+                return generateLWCSampleCode(descriptorInfo);
+            }
+
+            // Generate Aura-style sample message
             StringBuilder paramsBuilder = new StringBuilder();
             paramsBuilder.append("{");
 
@@ -1964,15 +2104,32 @@ public class ActionsTab {
     }
 
     /**
-     * Add discovered descriptor to results with formatted display
+     * Add discovered descriptor to results with formatted display (separate Aura and LWC categories)
      */
     private void addDescriptorToResults(DescriptorInfo descriptorInfo, String sessionTimestamp) {
         if (descriptorInfo == null || currentDescriptorResults == null) {
             return;
         }
 
+        String descriptor = descriptorInfo.getDescriptor();
+        boolean isLWC = !descriptor.startsWith("apex://");
+
+        // Determine category names based on type (Aura vs LWC)
+        String listCategoryName;
+        String detailsCategoryName;
+        String sampleLabel;
+
+        if (isLWC) {
+            listCategoryName = "LWC Apex Methods List (" + sessionTimestamp + ")";
+            detailsCategoryName = "LWC Apex Methods Details (" + sessionTimestamp + ")";
+            sampleLabel = "Sample Code";
+        } else {
+            listCategoryName = "Apex Descriptors List (Aura) (" + sessionTimestamp + ")";
+            detailsCategoryName = "Apex Descriptors Details (Aura) (" + sessionTimestamp + ")";
+            sampleLabel = "Sample Message";
+        }
+
         // === Category 1: Simple List - Just descriptor names ===
-        String listCategoryName = "Apex Descriptors List (" + sessionTimestamp + ")";
         java.util.List<String> listEntries = currentDescriptorResults.getRoutesForCategory(listCategoryName);
         if (listEntries == null) {
             listEntries = new java.util.ArrayList<>();
@@ -1985,7 +2142,6 @@ public class ActionsTab {
         currentDescriptorResults.addRouteCategory(listCategoryName, listEntries);
 
         // === Category 2: Detailed Information with separators ===
-        String detailsCategoryName = "Apex Descriptors Details (" + sessionTimestamp + ")";
         java.util.List<String> detailEntries = currentDescriptorResults.getRoutesForCategory(detailsCategoryName);
         if (detailEntries == null) {
             detailEntries = new java.util.ArrayList<>();
@@ -2020,21 +2176,27 @@ public class ActionsTab {
 
         // Format the complete detailed entry with separator
         String detailEntry;
+        String descriptorLabel = isLWC ? "Method" : "Descriptor";
+
         if (detailEntries.isEmpty()) {
             // First entry - no leading separator
             detailEntry = String.format(
-                "Descriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
+                "%s:\n%s\n\nParameters:\n%s\n\n%s:\n%s",
+                descriptorLabel,
                 descriptorInfo.getDescriptor(),
                 paramsDisplay,
+                sampleLabel,
                 sampleMessage
             );
         } else {
             // Subsequent entries - add separator before
             detailEntry = String.format(
-                "%s\n\nDescriptor:\n%s\n\nParameters:\n%s\n\nSample Message:\n%s",
+                "%s\n\n%s:\n%s\n\nParameters:\n%s\n\n%s:\n%s",
                 separator,
+                descriptorLabel,
                 descriptorInfo.getDescriptor(),
                 paramsDisplay,
+                sampleLabel,
                 sampleMessage
             );
         }
@@ -2042,7 +2204,8 @@ public class ActionsTab {
         detailEntries.add(detailEntry);
         currentDescriptorResults.addRouteCategory(detailsCategoryName, detailEntries);
 
-        api.logging().logToOutput("Found Apex descriptor: " + descriptorInfo.getDescriptor() + " with " + descriptorInfo.getParameters().size() + " parameters");
+        String typeLabel = isLWC ? "LWC Apex method" : "Aura descriptor";
+        api.logging().logToOutput("Found " + typeLabel + ": " + descriptorInfo.getDescriptor() + " with " + descriptorInfo.getParameters().size() + " parameters");
     }
 
     /**
