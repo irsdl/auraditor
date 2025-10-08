@@ -4042,10 +4042,11 @@ public class ActionsTab {
 
         // Discovery result selector depends on having discovery results
         discoveryResultSelector.setEnabled(hasRequests && hasDiscoveryResults);
-        
+
         if (!hasRequests) {
             // Show persistent error message when no requests are available
-            showErrorMessage("At least one base request is needed. Add requests from the Base Requests tab.");
+            // Note: Passive operations (router paths, JS paths, descriptors) don't need base requests
+            showErrorMessage("Base request required for active operations. Passive sitemap operations available without base request.");
         } else {
             // Only clear message when requests become available
             clearStatusMessage();
