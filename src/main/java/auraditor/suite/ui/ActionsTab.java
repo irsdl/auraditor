@@ -1907,58 +1907,18 @@ public class ActionsTab {
     }
 
     /**
-     * Find parameters for LWC Apex method by searching for the @AuraEnabled parameters
-     * Since LWC parameters aren't always visible in minified JS, we extract from invocations
+     * Find parameters for LWC Apex method
+     *
+     * NOTE: LWC imports from @salesforce/apex/ don't contain parameter information.
+     * Parameters would need to be extracted from method invocations in minified JS,
+     * which is unreliable and performance-intensive for large files (1-2MB).
+     *
+     * Instead, we return empty list and provide template-based output for users.
      */
     private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName) {
-        java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
-        java.util.Set<String> uniqueParamNames = new java.util.HashSet<>();
-
-        try {
-            // Skip if response body is too large to prevent performance issues
-            if (responseBody.length() > 500000) {
-                return parameters;
-            }
-
-            // Strategy: Look for object literal patterns with parameter names
-            // Examples from minified code: {email:t.email}, {record:i,accountRecordType:n}
-            // Pattern: {paramName:value,paramName2:value2}
-
-            Pattern paramObjectPattern = Pattern.compile(
-                "\\{\\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\\s*:",
-                Pattern.CASE_INSENSITIVE
-            );
-
-            Matcher matcher = paramObjectPattern.matcher(responseBody);
-            int matchCount = 0;
-            int maxMatches = 100; // Check more patterns but still limit
-
-            while (matcher.find() && matchCount < maxMatches) {
-                matchCount++;
-                String paramName = matcher.group(1);
-
-                // Filter out JavaScript keywords, built-ins, and very short names
-                if (paramName != null &&
-                    paramName.length() >= 3 &&
-                    paramName.length() <= 40 &&
-                    !paramName.matches("^(this|self|that|return|function|class|const|let|var|if|else|for|while|switch|case|break|continue|new|try|catch|finally|throw|typeof|instanceof|void|delete|true|false|null|undefined|window|document|console|exports|module|require|import|default|then|catch|async|await|yield|from|as|of|in|do|with|debugger|super|extends|static|get|set)$") &&
-                    // Check if it looks like a reasonable parameter name (not minified single letters mixed with common patterns)
-                    (paramName.length() > 3 || paramName.matches("^(id|key|url|uri|api|src|alt|obj)$"))) {
-                    uniqueParamNames.add(paramName);
-                }
-            }
-
-            // Convert to ParameterInfo objects
-            // Since we don't have type information in LWC JS, use "Object" as generic type
-            for (String paramName : uniqueParamNames) {
-                parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
-            }
-
-        } catch (Exception e) {
-            api.logging().logToError("Error finding LWC parameters for method " + methodName + ": " + e.getMessage());
-        }
-
-        return parameters;
+        // Return empty list - LWC imports don't contain parameter information
+        // Users will see helpful templates instead
+        return new java.util.ArrayList<>();
     }
 
     /**
@@ -2020,41 +1980,32 @@ public class ActionsTab {
         try {
             String descriptor = descriptorInfo.getDescriptor();
             String[] parts = descriptor.split("\\.");
-            String controllerName = parts.length > 0 ? descriptor : "Controller";
             String methodName = parts.length > 1 ? parts[parts.length - 1] : "method";
 
             StringBuilder sample = new StringBuilder();
 
-            // Import statement
+            // Apex Method Signature Template
+            sample.append("=== Apex Method (Server-Side) ===\n");
+            sample.append("@AuraEnabled\n");
+            sample.append("public static ReturnType ").append(methodName).append("(ParameterType paramName) {\n");
+            sample.append("    // Implementation\n");
+            sample.append("}\n\n");
+
+            // LWC Import
+            sample.append("=== LWC Import (Client-Side) ===\n");
             sample.append("import ").append(methodName);
             sample.append(" from '@salesforce/apex/").append(descriptor).append("';\n\n");
 
-            // Method invocation example
-            sample.append(methodName).append("({\n");
-
-            if (descriptorInfo.getParameters().isEmpty()) {
-                sample.append("    // No parameters\n");
-            } else {
-                // Add parameters
-                for (int i = 0; i < descriptorInfo.getParameters().size(); i++) {
-                    DescriptorInfo.ParameterInfo param = descriptorInfo.getParameters().get(i);
-                    if (i > 0) {
-                        sample.append(",\n");
-                    }
-                    sample.append("    ").append(param.getName()).append(": ");
-                    sample.append(generateSampleValue(param.getType()));
-                }
-                sample.append("\n");
-            }
-
-            sample.append("})\n");
-            sample.append(".then(result => console.log(result))\n");
-            sample.append(".catch(error => console.error(error));");
+            // Sample Invocation
+            sample.append("=== Sample Invocation ===\n");
+            sample.append(methodName).append("({ paramName: value })\n");
+            sample.append("    .then(result => console.log(result))\n");
+            sample.append("    .catch(error => console.error(error));");
 
             return sample.toString();
         } catch (Exception e) {
-            api.logging().logToError("Error generating LWC sample code: " + e.getMessage());
-            return "// Error generating sample code for: " + descriptorInfo.getDescriptor();
+            api.logging().logToError("Error generating LWC template: " + e.getMessage());
+            return "// Error generating template for: " + descriptorInfo.getDescriptor();
         }
     }
 
@@ -2120,7 +2071,7 @@ public class ActionsTab {
         if (isLWC) {
             listCategoryName = "LWC Apex Methods List (" + sessionTimestamp + ")";
             detailsCategoryName = "LWC Apex Methods Details (" + sessionTimestamp + ")";
-            sampleLabel = "Sample Code";
+            sampleLabel = "Template";
         } else {
             listCategoryName = "Apex Descriptors List (Aura) (" + sessionTimestamp + ")";
             detailsCategoryName = "Apex Descriptors Details (Aura) (" + sessionTimestamp + ")";
@@ -2150,7 +2101,8 @@ public class ActionsTab {
         // Format parameters for display as JSON array
         String paramsDisplay;
         if (descriptorInfo.getParameters().isEmpty()) {
-            paramsDisplay = "No parameters";
+            // For LWC, clarify that parameters are unknown (not absent)
+            paramsDisplay = isLWC ? "(Unknown - see template below)" : "No parameters";
         } else {
             StringBuilder paramsBuilder = new StringBuilder();
             paramsBuilder.append("[");
