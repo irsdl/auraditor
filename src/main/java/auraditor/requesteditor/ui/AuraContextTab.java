@@ -155,8 +155,11 @@ public class AuraContextTab implements ExtensionProvidedHttpRequestEditor, Exten
         }
 
         try {
+            // Preprocess JSON to escape control characters
+            String processedJson = preprocessJsonForParsing(contextJson);
+
             // Create context panel for editing context directly with the JSON
-            contextPanel = new AuraContextPanel(contextJson, editable, api);
+            contextPanel = new AuraContextPanel(processedJson, editable, api);
             this.pane.add("Context", contextPanel);
 
         } catch (Exception e) {
@@ -202,6 +205,102 @@ public class AuraContextTab implements ExtensionProvidedHttpRequestEditor, Exten
     private void cleanTab() {
         pane.removeAll();
         pane.revalidate();
+    }
+
+    /**
+     * Preprocess JSON to handle control characters and ensure proper parsing
+     */
+    private String preprocessJsonForParsing(String jsonText) {
+        if (jsonText == null || jsonText.trim().isEmpty()) {
+            return jsonText;
+        }
+
+        String processed = jsonText;
+
+        // 1. Ensure proper line ending normalization
+        processed = processed.replace("\r\n", "\n").replace("\r", "\n");
+
+        // 2. Handle URL-encoded control characters and escape them properly for JSON
+        processed = processed.replace("%0A", "\\n");
+        processed = processed.replace("%0D", "\\r");
+        processed = processed.replace("%09", "\\t");
+
+        // 3. Escape any literal control characters that might be in the JSON
+        processed = escapeControlCharactersInJson(processed);
+
+        // 4. Clean up any extra whitespace
+        processed = processed.trim();
+
+        // 5. Handle very long single-line JSON
+        if (!processed.contains("\n") && processed.length() > 1000) {
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper tempMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode tempNode = tempMapper.readTree(processed);
+                processed = tempMapper.writeValueAsString(tempNode);
+            } catch (Exception e) {
+                api.logging().logToOutput("Could not reformat potential minified JSON, using original");
+            }
+        }
+
+        return processed;
+    }
+
+    /**
+     * Escape control characters within JSON string values
+     */
+    private String escapeControlCharactersInJson(String json) {
+        if (json == null || json.isEmpty()) {
+            return json;
+        }
+
+        StringBuilder result = new StringBuilder(json.length());
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            // Track if we're inside a string
+            if (c == '"' && !escaped) {
+                inString = !inString;
+                result.append(c);
+                continue;
+            }
+
+            // Track escape sequences
+            if (c == '\\' && !escaped) {
+                escaped = true;
+                result.append(c);
+                continue;
+            }
+
+            // If we're in a string and encounter a control character, escape it
+            if (inString && !escaped) {
+                if (c == '\n') {
+                    result.append("\\n");
+                    continue;
+                } else if (c == '\r') {
+                    result.append("\\r");
+                    continue;
+                } else if (c == '\t') {
+                    result.append("\\t");
+                    continue;
+                } else if (c < 0x20) {
+                    // Other control characters - escape as unicode
+                    result.append(String.format("\\u%04x", (int) c));
+                    continue;
+                }
+            }
+
+            // Reset escaped flag
+            if (escaped) {
+                escaped = false;
+            }
+
+            result.append(c);
+        }
+
+        return result.toString();
     }
 
     /**

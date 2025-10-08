@@ -561,7 +561,7 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
     }
 
     /**
-     * Preprocess JSON text to handle multiline beautified JSON issues
+     * Preprocess JSON text to handle multiline beautified JSON issues and escape control characters
      */
     private String preprocessJsonForParsing(String jsonText) {
         if (jsonText == null || jsonText.trim().isEmpty()) {
@@ -575,13 +575,20 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
         // 1. Ensure proper line ending normalization
         processed = processed.replace("\r\n", "\n").replace("\r", "\n");
 
-        // 2. Handle potential encoding artifacts
-        processed = processed.replace("%0A", "\n").replace("%0D", "");
+        // 2. Handle URL-encoded control characters and escape them properly for JSON
+        // Replace %0A (URL-encoded newline) with escaped JSON newline
+        processed = processed.replace("%0A", "\\n");
+        processed = processed.replace("%0D", "\\r");
+        processed = processed.replace("%09", "\\t");
 
-        // 3. Clean up any extra whitespace while preserving JSON structure
+        // 3. Escape any literal control characters that might be in the JSON
+        // This handles cases where control chars are already decoded
+        processed = escapeControlCharactersInJson(processed);
+
+        // 4. Clean up any extra whitespace while preserving JSON structure
         processed = processed.trim();
 
-        // 4. If JSON appears to be minified on one line but should be multiline,
+        // 5. If JSON appears to be minified on one line but should be multiline,
         //    attempt to detect and fix formatting issues
         if (!processed.contains("\n") && processed.length() > 1000) {
             // Very long single-line JSON might be improperly formatted
@@ -598,6 +605,65 @@ public class AuraActionsTab implements ExtensionProvidedHttpRequestEditor, Exten
         }
 
         return processed;
+    }
+
+    /**
+     * Escape control characters within JSON string values
+     * This handles literal control characters that appear in JSON strings
+     */
+    private String escapeControlCharactersInJson(String json) {
+        if (json == null || json.isEmpty()) {
+            return json;
+        }
+
+        StringBuilder result = new StringBuilder(json.length());
+        boolean inString = false;
+        boolean escaped = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            // Track if we're inside a string
+            if (c == '"' && !escaped) {
+                inString = !inString;
+                result.append(c);
+                continue;
+            }
+
+            // Track escape sequences
+            if (c == '\\' && !escaped) {
+                escaped = true;
+                result.append(c);
+                continue;
+            }
+
+            // If we're in a string and encounter a control character, escape it
+            if (inString && !escaped) {
+                if (c == '\n') {
+                    result.append("\\n");
+                    continue;
+                } else if (c == '\r') {
+                    result.append("\\r");
+                    continue;
+                } else if (c == '\t') {
+                    result.append("\\t");
+                    continue;
+                } else if (c < 0x20) {
+                    // Other control characters - escape as unicode
+                    result.append(String.format("\\u%04x", (int) c));
+                    continue;
+                }
+            }
+
+            // Reset escaped flag
+            if (escaped) {
+                escaped = false;
+            }
+
+            result.append(c);
+        }
+
+        return result.toString();
     }
 
     /**
