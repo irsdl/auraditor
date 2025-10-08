@@ -4750,9 +4750,12 @@ public class ActionsTab {
         }
         
         private void updateObjectList() {
+            // Save current scroll position to preserve it during updates
+            int currentCaretPosition = objectListArea.getCaretPosition();
+
             String selectedCategory = categoryList.getSelectedValue();
             if (selectedCategory == null) return;
-            
+
             // Find the original index of this category
             int originalIndex = -1;
             for (int i = 0; i < originalCategories.length; i++) {
@@ -4761,20 +4764,30 @@ public class ActionsTab {
                     break;
                 }
             }
-            
+
             if (originalIndex == -1) return;
-            
+
             Set<String> objects = getObjectsForCategoryIndex(originalIndex);
-            
+
             // Sort and display objects, each on a new line
             StringBuilder content = new StringBuilder();
             objects.stream()
                     .sorted()
                     .forEach(obj -> content.append(obj).append("\n"));
-            
+
             objectListArea.setText(content.toString());
-            objectListArea.setCaretPosition(0); // Scroll to top
-            
+
+            // Restore scroll position if valid, otherwise scroll to top
+            try {
+                if (currentCaretPosition > 0 && currentCaretPosition < objectListArea.getText().length()) {
+                    objectListArea.setCaretPosition(currentCaretPosition);
+                } else {
+                    objectListArea.setCaretPosition(0);
+                }
+            } catch (IllegalArgumentException e) {
+                objectListArea.setCaretPosition(0);
+            }
+
             // Clear search when content changes
             clearSearch();
         }
@@ -4973,23 +4986,28 @@ public class ActionsTab {
                 this.routeDiscoveryResult.addRouteCategory(categoryName, routes);
             }
 
-            // Update UI models
+            // Update UI models (preserves current selection)
             updateCategoryModels();
 
-            // Select the newly added category
-            String[] categoryNames = newResult.getCategoryNames().toArray(new String[0]);
-            if (categoryNames.length > 0) {
-                String newCategory = categoryNames[0]; // Select first new category
-                for (int i = 0; i < filteredCategoryModel.getSize(); i++) {
-                    if (filteredCategoryModel.get(i).equals(newCategory)) {
-                        categoryList.setSelectedIndex(i);
-                        break;
+            // Only auto-select the newly added category if user hasn't selected anything yet
+            if (categoryList.getSelectedIndex() == -1) {
+                String[] categoryNames = newResult.getCategoryNames().toArray(new String[0]);
+                if (categoryNames.length > 0) {
+                    String newCategory = categoryNames[0]; // Select first new category
+                    for (int i = 0; i < filteredCategoryModel.getSize(); i++) {
+                        if (filteredCategoryModel.get(i).equals(newCategory)) {
+                            categoryList.setSelectedIndex(i);
+                            break;
+                        }
                     }
                 }
             }
         }
 
         private void updateCategoryModels() {
+            // Save current selection to preserve it after rebuild
+            String currentSelection = categoryList.getSelectedValue();
+
             originalCategoryModel.clear();
             filteredCategoryModel.clear();
 
@@ -4997,9 +5015,22 @@ public class ActionsTab {
                 originalCategoryModel.addElement(categoryName);
                 filteredCategoryModel.addElement(categoryName);
             }
+
+            // Restore selection if it still exists in the updated model
+            if (currentSelection != null) {
+                for (int i = 0; i < filteredCategoryModel.getSize(); i++) {
+                    if (filteredCategoryModel.get(i).equals(currentSelection)) {
+                        categoryList.setSelectedIndex(i);
+                        break;
+                    }
+                }
+            }
         }
 
         private void updateRouteDisplay() {
+            // Save current scroll position to preserve it during updates
+            int currentCaretPosition = routeListArea.getCaretPosition();
+
             String selectedCategory = categoryList.getSelectedValue();
             if (selectedCategory == null) {
                 if (routeDiscoveryResult.getCategoryNames().isEmpty()) {
@@ -5023,7 +5054,17 @@ public class ActionsTab {
             }
 
             routeListArea.setText(content.toString());
-            routeListArea.setCaretPosition(0);
+
+            // Restore scroll position if valid, otherwise scroll to top
+            try {
+                if (currentCaretPosition > 0 && currentCaretPosition < routeListArea.getText().length()) {
+                    routeListArea.setCaretPosition(currentCaretPosition);
+                } else {
+                    routeListArea.setCaretPosition(0);
+                }
+            } catch (IllegalArgumentException e) {
+                routeListArea.setCaretPosition(0);
+            }
         }
 
         private void setupContextMenu() {
@@ -5688,11 +5729,24 @@ public class ActionsTab {
         }
         
         private void updateJsonData() {
+            // Save current scroll position to preserve it during updates
+            int currentCaretPosition = jsonDataArea.getCaretPosition();
+
             String selectedObject = objectList.getSelectedValue();
             if (selectedObject != null) {
                 String jsonData = currentObjectData.get(selectedObject);
                 jsonDataArea.setText(jsonData != null ? jsonData : "No data available");
-                jsonDataArea.setCaretPosition(0); // Scroll to top
+
+                // Restore scroll position if valid, otherwise scroll to top
+                try {
+                    if (currentCaretPosition > 0 && currentCaretPosition < jsonDataArea.getText().length()) {
+                        jsonDataArea.setCaretPosition(currentCaretPosition);
+                    } else {
+                        jsonDataArea.setCaretPosition(0);
+                    }
+                } catch (IllegalArgumentException e) {
+                    jsonDataArea.setCaretPosition(0);
+                }
             } else {
                 jsonDataArea.setText("Select an object to view its data");
             }
