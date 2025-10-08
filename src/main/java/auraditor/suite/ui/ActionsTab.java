@@ -4499,7 +4499,12 @@ public class ActionsTab {
             categoryList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
                     updateObjectList();
-                    clearSearch(); // Clear search when changing categories
+                    // Re-run search if there's active search text, otherwise clear
+                    if (searchField != null && !searchField.getText().trim().isEmpty()) {
+                        performSearch();
+                    } else {
+                        clearSearch();
+                    }
                 }
             });
             
@@ -4964,6 +4969,12 @@ public class ActionsTab {
             categoryList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
                     updateRouteDisplay();
+                    // Re-run search if there's active search text, otherwise clear
+                    if (searchField != null && !searchField.getText().trim().isEmpty()) {
+                        performSearch();
+                    } else {
+                        clearSearch();
+                    }
                 }
             });
 
@@ -5448,7 +5459,12 @@ public class ActionsTab {
             objectList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
                     updateJsonData();
-                    clearSearch(); // Clear search when changing selection
+                    // Re-run search if there's active search text, otherwise clear
+                    if (searchField != null && !searchField.getText().trim().isEmpty()) {
+                        performSearch();
+                    } else {
+                        clearSearch();
+                    }
                 }
             });
 
@@ -6511,6 +6527,12 @@ public class ActionsTab {
                     String selectedRecord = recordList.getSelectedValue();
                     if (selectedRecord != null) {
                         dataArea.setText(recordData);
+                        // Re-run search if there's active search text, otherwise clear
+                        if (searchField != null && !searchField.getText().trim().isEmpty()) {
+                            performSearch();
+                        } else {
+                            clearSearch();
+                        }
                     }
                 }
             });
