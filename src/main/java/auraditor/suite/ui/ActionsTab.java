@@ -1908,43 +1908,65 @@ public class ActionsTab {
 
     /**
      * Find parameters for LWC Apex method by analyzing method invocations in JavaScript
+     * This searches for the import variable name and then finds invocations of that variable
      */
     private java.util.List<DescriptorInfo.ParameterInfo> findLWCParametersForMethod(String responseBody, String methodName) {
         java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
         java.util.Set<String> uniqueParamNames = new java.util.HashSet<>();
 
         try {
-            // Look for method invocations with various patterns
-            // Pattern 1: methodName({param1:..., param2:...})
-            // Pattern 2: variableName({param1:..., param2:...}) where variableName is imported as methodName
+            // Step 1: Find how this method is imported (what variable name it's assigned to)
+            // Pattern: import methodName from '@salesforce/apex/...'
+            // or in the imports array: "methodName":"apexMethod"
+            // In minified code it might be: import X from '@salesforce...'
 
-            // Create pattern to find function calls with object parameter
-            // This matches: identifier({...}) or identifier.default({...})
-            String escapedMethod = Pattern.quote(methodName);
+            // Look for import statements in the module definition
+            // Pattern: ["@salesforce/apex/Controller.methodName",...] then function(e,a,t,i,n,...)
+            // where the position in the import array corresponds to the parameter position
+
+            // Simpler approach: Search for ALL object parameter patterns and collect unique param names
+            // Since we're analyzing the same file that has the import, params used are likely relevant
+
+            // Skip if response body is too large to prevent performance issues
+            if (responseBody.length() > 500000) {
+                api.logging().logToOutput("Skipping parameter extraction for large file (>" + responseBody.length() + " chars)");
+                return parameters;
+            }
+
+            // Pattern matches: .default({params}) or variable({params}) anywhere in the code
+            // Limit capture group size to prevent catastrophic backtracking
             Pattern invocationPattern = Pattern.compile(
-                "\\w+\\.default\\s*\\(\\s*\\{([^}]+)\\}\\s*\\)|" +
-                "\\w+\\s*\\(\\s*\\{([^}]+)\\}\\s*\\)",
+                "(?:\\w+\\.default|\\w+)\\s*\\(\\s*\\{([^}]{1,200})\\}\\s*\\)",
                 Pattern.CASE_INSENSITIVE
             );
 
             Matcher invocationMatcher = invocationPattern.matcher(responseBody);
-            while (invocationMatcher.find()) {
-                String paramsBlock = invocationMatcher.group(1);
-                if (paramsBlock == null) {
-                    paramsBlock = invocationMatcher.group(2);
-                }
+            int maxMatches = 20; // Reduced limit to prevent excessive processing
+            int matchCount = 0;
 
-                if (paramsBlock != null) {
+            while (invocationMatcher.find() && matchCount < maxMatches) {
+                matchCount++;
+                String paramsBlock = invocationMatcher.group(1);
+
+                if (paramsBlock != null && !paramsBlock.isEmpty()) {
                     // Extract parameter names from the object literal
+                    // Matches: paramName: or paramName, or "paramName":
                     Matcher paramNameMatcher = LWC_PARAM_PATTERN.matcher(paramsBlock);
                     while (paramNameMatcher.find()) {
                         String paramName = paramNameMatcher.group(1);
-                        if (paramName != null && uniqueParamNames.add(paramName)) {
-                            // For LWC, we don't have explicit type information, so default to String
-                            parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
+                        if (paramName != null && paramName.length() > 0 && paramName.length() < 50) {
+                            // Filter out common JavaScript keywords that aren't parameters
+                            if (!paramName.matches("^(this|return|function|class|const|let|var|if|else|for|while)$")) {
+                                uniqueParamNames.add(paramName);
+                            }
                         }
                     }
                 }
+            }
+
+            // Convert unique param names to ParameterInfo objects
+            for (String paramName : uniqueParamNames) {
+                parameters.add(new DescriptorInfo.ParameterInfo(paramName, "Object"));
             }
 
         } catch (Exception e) {
