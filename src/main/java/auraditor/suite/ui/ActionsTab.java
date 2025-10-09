@@ -847,6 +847,7 @@ public class ActionsTab {
         getRouterInitializerPathsBtn.setEnabled(false);
         getPotentialPathsFromJSBtn.setEnabled(false);
         findDescriptorsFromSitemapBtn.setEnabled(false);
+        performAllSitemapSearchesBtn.setEnabled(false);
 
         // Disable all input controls
         requestSelector.setEnabled(false);
