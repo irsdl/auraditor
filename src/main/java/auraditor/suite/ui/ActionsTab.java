@@ -2009,8 +2009,17 @@ public class ActionsTab {
 
                     // Find all method calls and extract parameter names
                     java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+
+                    // Strategy 1: Search for specific identifiers (works for most cases)
                     for (String identifier : identifiers) {
                         java.util.List<String> params = findLWCCallParameters(factoryBody, identifier);
+                        paramNames.addAll(params);
+                    }
+
+                    // Strategy 2: If no params found, search for ANY .default({...}) calls in factory body
+                    // This handles cases like: condition ? B.default({params}) : alternative
+                    if (paramNames.isEmpty()) {
+                        java.util.List<String> params = findAllLWCDefaultCalls(factoryBody);
                         paramNames.addAll(params);
                     }
 
@@ -2131,6 +2140,39 @@ public class ActionsTab {
             }
         } catch (Exception e) {
             api.logging().logToError("Error finding calls for identifier '" + identifier + "': " + e.getMessage());
+        }
+
+        return new java.util.ArrayList<>(paramNames);
+    }
+
+    /**
+     * Find ALL .default({...}) calls in the factory body (fallback strategy)
+     * Used when specific identifier matching fails (e.g., conditional calls)
+     * Example: condition ? B.default({params}) : alternative
+     */
+    private java.util.List<String> findAllLWCDefaultCalls(String body) {
+        java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+
+        try {
+            // Pattern: any identifier followed by .default({...})
+            Pattern callPattern = Pattern.compile("\\b([A-Za-z_$][\\w$]*)\\.default\\s*\\(\\s*\\{([^}]*)\\}");
+            Matcher callMatcher = callPattern.matcher(body);
+
+            while (callMatcher.find()) {
+                String objectLiteral = callMatcher.group(2);
+
+                Pattern keyPattern = Pattern.compile("([A-Za-z_$][\\w$]*)\\s*:");
+                Matcher keyMatcher = keyPattern.matcher(objectLiteral);
+
+                while (keyMatcher.find()) {
+                    String paramName = keyMatcher.group(1);
+                    if (!isJavaScriptKeyword(paramName)) {
+                        paramNames.add(paramName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error finding any .default() calls: " + e.getMessage());
         }
 
         return new java.util.ArrayList<>(paramNames);
