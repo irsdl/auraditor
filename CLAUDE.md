@@ -94,3 +94,105 @@ if (requestResponse.response().statedMimeType() == MimeType.SCRIPT) {
 - Java 11+
 - Maven 3.6+
 - Dependencies are managed in `pom.xml` with Maven Shade plugin for packaging
+
+## BApp Store Compliance
+
+### Official Documentation
+- **Submission Guide**: https://portswigger.net/burp/documentation/desktop/extend-burp/extensions/creating/bapp-store-submitting-extensions
+- **Acceptance Criteria**: https://portswigger.net/burp/documentation/desktop/extend-burp/extensions/creating/bapp-store-acceptance-criteria
+
+### Functional Requirements (MUST COMPLY)
+1. **Unique Functionality**: Extension must perform a function not already available
+2. **Clear Naming**: Use descriptive, meaningful names
+3. **Include Dependencies**: All required dependencies must be bundled
+4. **Offline Support**: Must work without external network dependencies
+5. **Scale Well**: Handle large projects effectively
+
+### Technical Requirements (MUST COMPLY)
+1. **Threading**: Use background threads to maintain UI responsiveness
+   - ✅ Implemented via `ThreadManager.createManagedThread()`
+   - ✅ UI updates via `SwingUtilities.invokeLater()`
+
+2. **Clean Unload**: Release all resources when extension unloads
+   - ✅ Implemented in `BurpExtender.cleanup()` method
+   - ✅ `ThreadManager.shutdown()` stops all managed threads
+
+3. **Burp Networking**: Use Burp's networking methods for HTTP requests
+   - ✅ All HTTP operations use Montoya API (`api.http()`)
+
+4. **Montoya API**: Must use `montoya-api` artifact
+   - ✅ Configured in `pom.xml` as provided dependency
+
+5. **GUI Parent Frame**: Create GUI elements with proper parent frame
+   - ✅ All dialogs and UI components use proper parent references
+   - ✅ See `AuraditorSuiteTab` constructor and dialog creation
+
+6. **AI Functionality**: Use Montoya API for AI features (if applicable)
+   - N/A - Extension does not use AI features
+
+### Security Requirements (MUST COMPLY)
+1. **Secure Operations**: Operate securely with untrusted HTTP content
+   - ✅ All user input is validated and sanitized
+   - ✅ URL parsing wrapped in try-catch blocks
+
+2. **Thread Safety**: Protect shared data structures with locks
+   - ✅ Thread-safe collections used where appropriate
+   - ✅ UI updates properly synchronized via Swing EDT
+
+3. **Exception Handling**: Handle exceptions in background threads
+   - ✅ All background operations have try-catch blocks
+   - ✅ Errors logged via `api.logging().logToError()`
+
+4. **No Active Operations in Passive Mode**: Avoid communication to target in passive audit methods
+   - ✅ Passive operations (descriptor discovery) only read from sitemap
+   - ✅ Active operations clearly separated and require user action
+
+### Performance Guidelines (SHOULD COMPLY)
+1. **Avoid EDT Blocking**: Don't perform slow operations in Swing Event Dispatch Thread
+   - ✅ Long operations run in background threads
+   - ✅ Progress updates via `SwingUtilities.invokeLater()`
+
+2. **Memory Management**: Don't keep long-term references to transient objects
+   - ✅ Request/response data not stored long-term
+   - ✅ Results displayed and then released
+
+3. **Large Data Sets**: Be cautious with methods like `SiteMap.requestResponses()`
+   - ✅ Sitemap queries filtered by URL patterns
+   - ✅ Progress tracking prevents UI freezing
+
+### Submission Process
+When ready to submit to BApp Store:
+
+1. **Verify Compliance**: Review all requirements above
+2. **Prepare Repository**: Ensure GitHub repo has:
+   - Complete source code
+   - Clear README with usage instructions
+   - Build instructions (Maven commands)
+   - License file (BSD-3-Clause)
+
+3. **Submit via Email**: Send to support@portswigger.net with:
+   - GitHub repository link
+   - Extension name: "Auraditor"
+   - Detailed description of functionality
+   - Usage instructions
+
+4. **Review Process**: PortSwigger will:
+   - Compile and review the code
+   - Check for unique functionality
+   - Run automated and manual tests
+   - Scan for antivirus/malware issues
+   - Communicate with developer for any issues
+
+### Compliance Checklist
+- [x] Uses Montoya API exclusively
+- [x] Background threads for long operations
+- [x] Clean unload with resource cleanup
+- [x] GUI elements have parent frames
+- [x] Exception handling in all threads
+- [x] No EDT blocking
+- [x] Thread-safe data structures
+- [x] Secure handling of HTTP content
+- [x] Passive operations don't communicate with target
+- [x] All dependencies bundled in JAR
+- [x] Clear, descriptive naming
+- [x] Works offline (no external network dependencies)
