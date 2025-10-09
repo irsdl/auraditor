@@ -1939,15 +1939,26 @@ public class ActionsTab {
         java.util.List<LWCApexMethod> results = new java.util.ArrayList<>();
 
         try {
+            // Performance safeguard: Skip very large files to prevent regex catastrophic backtracking
+            // and excessive character-by-character iteration in findMatchingBrace()
+            if (jsContent.length() > 1_000_000) {  // 1MB limit
+                api.logging().logToOutput("Skipping LWC extraction for file > 1MB (performance safeguard)");
+                return results;
+            }
+
             // Pattern: $A.componentService.addModule('markup://...', \"path\",[deps],function(params){
+            // Limit deps array capture to prevent backtracking
             Pattern modulePattern = Pattern.compile(
-                "\\$A\\.componentService\\.addModule\\('[^']+',\\s*\\\\\"([^\\\\\"]+)\\\\\"\\s*,\\s*(\\[[\\s\\S]*?\\])\\s*,\\s*function\\s*\\(([^)]*)\\)\\s*\\{",
+                "\\$A\\.componentService\\.addModule\\('[^']+',\\s*\\\\\"([^\\\\\"]+)\\\\\"\\s*,\\s*(\\[[^\\]]{0,5000}\\])\\s*,\\s*function\\s*\\(([^)]*)\\)\\s*\\{",
                 Pattern.DOTALL
             );
 
             Matcher moduleMatcher = modulePattern.matcher(jsContent);
+            int moduleCount = 0;
+            int maxModules = 50;  // Limit number of modules to process
 
-            while (moduleMatcher.find()) {
+            while (moduleMatcher.find() && moduleCount < maxModules) {
+                moduleCount++;
                 String modulePath = moduleMatcher.group(1);
                 String depsArrayText = moduleMatcher.group(2);
                 String factoryParamsText = moduleMatcher.group(3);
@@ -2024,10 +2035,12 @@ public class ActionsTab {
 
     /**
      * Find matching closing brace for a given opening brace position
+     * Limited search to prevent excessive iteration on large files
      */
     private int findMatchingBrace(String text, int openPos) {
         int depth = 1;
-        for (int i = openPos + 1; i < text.length(); i++) {
+        int maxSearch = Math.min(openPos + 100000, text.length());  // Limit search to 100KB
+        for (int i = openPos + 1; i < maxSearch; i++) {
             char c = text.charAt(i);
             if (c == '{') depth++;
             else if (c == '}') {
@@ -2035,7 +2048,7 @@ public class ActionsTab {
                 if (depth == 0) return i;
             }
         }
-        return -1;
+        return -1;  // Not found within search limit
     }
 
     /**
