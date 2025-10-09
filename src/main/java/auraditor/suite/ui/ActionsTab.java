@@ -1941,8 +1941,8 @@ public class ActionsTab {
         try {
             // Performance safeguard: Skip very large files to prevent regex catastrophic backtracking
             // and excessive character-by-character iteration in findMatchingBrace()
-            if (jsContent.length() > 1_000_000) {  // 1MB limit
-                api.logging().logToOutput("Skipping LWC extraction for file > 1MB (performance safeguard)");
+            if (jsContent.length() > 2_000_000) {  // 2MB limit
+                api.logging().logToOutput("Skipping LWC extraction for file > 2MB (performance safeguard)");
                 return results;
             }
 
@@ -1970,18 +1970,16 @@ public class ActionsTab {
 
                 String factoryBody = jsContent.substring(bodyStart, bodyEnd);
 
-                // Only process LWC modules (c/... paths)
-                if (!modulePath.startsWith("c/")) {
-                    continue;
-                }
-
                 // Extract dependencies and factory parameters
                 java.util.List<String> deps = extractDepsArrayInOrder(depsArrayText);
                 java.util.List<String> factoryParams = extractFactoryParameters(factoryParamsText);
 
                 // Find Apex dependencies
+                // Pattern handles both formats:
+                // - @salesforce/apex/ControllerName.methodName
+                // - @salesforce/apex/namespace.ControllerName.methodName (with namespace)
                 java.util.List<ApexDependency> apexDeps = new java.util.ArrayList<>();
-                Pattern apexPattern = Pattern.compile("^@salesforce/apex/([\\w$]+)\\.([\\w$]+)$");
+                Pattern apexPattern = Pattern.compile("^@salesforce/apex/([\\w$.]+)\\.([\\w$]+)$");
 
                 for (int i = 0; i < deps.size(); i++) {
                     Matcher apexMatcher = apexPattern.matcher(deps.get(i));
