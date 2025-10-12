@@ -2024,6 +2024,25 @@ public class ActionsTab {
                         paramNames.addAll(params);
                     }
 
+                    // Strategy 3: Search for method reference pattern: anyIdentifier.methodName,[{params}]
+                    // This handles cases where the method is passed as a reference to another function
+                    // Example: c.default(..., r.logUsageInteractionEvent, [{componentType:"...", componentName:"..."}])
+                    // Note: Search the ENTIRE JS file, not just this module, because the method might be
+                    // exported from this module but used in another module
+                    if (paramNames.isEmpty()) {
+                        java.util.List<String> params = findLWCMethodReferenceParameters(jsContent, identifiers, apexDep.methodName);
+                        paramNames.addAll(params);
+                    }
+
+                    // Strategy 4: Search for ternary/conditional method selection pattern
+                    // This handles cases like: {params:{input:...,options:...}, apexMethod:condition?id.method1:id.method2}
+                    // Both methods in the ternary share the same params object
+                    // Example: apexMethod:e.options.useContinuation?o.genericInvoke2:o.genericInvoke2NoCont
+                    if (paramNames.isEmpty()) {
+                        java.util.List<String> params = findLWCTernaryMethodParameters(jsContent, identifiers, apexDep.methodName);
+                        paramNames.addAll(params);
+                    }
+
                     // Create ParameterInfo objects
                     java.util.List<DescriptorInfo.ParameterInfo> parameters = new java.util.ArrayList<>();
                     for (String paramName : paramNames) {
@@ -2177,6 +2196,144 @@ public class ActionsTab {
         }
 
         return new java.util.ArrayList<>(paramNames);
+    }
+
+    /**
+     * Find parameters from method reference pattern: anyIdentifier.methodName,[{params}]
+     * This handles cases where the method is passed as a reference to another function
+     * Example: c.default(..., r.logUsageInteractionEvent, [{componentType:"...", componentName:"..."}])
+     *
+     * Note: This searches the entire JS content because the method may be exported from one module
+     * and used in a different module with a different identifier name.
+     *
+     * @param jsContent The entire JavaScript file content to search
+     * @param identifiers The identifiers from the exporting module (not used, kept for signature compatibility)
+     * @param methodName The Apex method name to search for
+     * @return List of parameter names found
+     */
+    private java.util.List<String> findLWCMethodReferenceParameters(String jsContent, java.util.Set<String> identifiers, String methodName) {
+        java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+
+        try {
+            // Pattern: ANY identifier followed by .methodName,[{...}]
+            // We can't rely on the factory param identifier because the method may be used in a different module
+            String patternStr = "\\b[A-Za-z_$][\\w$]*\\." + methodName + "\\s*,\\s*\\[\\s*\\{([^}]+)\\}";
+            Pattern pattern = Pattern.compile(patternStr);
+            Matcher matcher = pattern.matcher(jsContent);
+
+            while (matcher.find()) {
+                String objectLiteral = matcher.group(1);
+
+                // Extract parameter names from the object literal
+                Pattern keyPattern = Pattern.compile("([A-Za-z_$][\\w$]*)\\s*:");
+                Matcher keyMatcher = keyPattern.matcher(objectLiteral);
+
+                while (keyMatcher.find()) {
+                    String paramName = keyMatcher.group(1);
+                    if (!isJavaScriptKeyword(paramName)) {
+                        paramNames.add(paramName);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Error finding method reference parameters: " + e.getMessage());
+        }
+
+        return new java.util.ArrayList<>(paramNames);
+    }
+
+    /**
+     * Find parameters from ternary/conditional method selection pattern
+     * This handles cases like: {params:{input:...,options:...}, apexMethod:condition?id.method1:id.method2}
+     * Both methods in the ternary share the same params object.
+     *
+     * @param jsContent The entire JavaScript file content to search
+     * @param identifiers The identifiers from the exporting module
+     * @param methodName The Apex method name to search for
+     * @return List of parameter names found
+     */
+    private java.util.List<String> findLWCTernaryMethodParameters(String jsContent, java.util.Set<String> identifiers, String methodName) {
+        java.util.Set<String> paramNames = new java.util.LinkedHashSet<>();
+
+        try {
+            // Pattern: return{params:{...},apexMethod:...?identifier.method1:identifier.method2}
+            // The params object can contain nested ternaries, so we need to carefully extract it
+
+            // First, find all occurrences of the methodName in apexMethod ternaries
+            String ternaryPatternStr = "apexMethod:[^?]+\\?[^:]*\\b[A-Za-z_$][\\w$]*\\.(\\w+)\\b[^:]*:\\s*\\b[A-Za-z_$][\\w$]*\\.(\\w+)\\b";
+            Pattern ternaryPattern = Pattern.compile(ternaryPatternStr);
+            Matcher ternaryMatcher = ternaryPattern.matcher(jsContent);
+
+            while (ternaryMatcher.find()) {
+                String method1 = ternaryMatcher.group(1);
+                String method2 = ternaryMatcher.group(2);
+
+                // Check if either side matches our target method (case-insensitive because JS may use different casing)
+                if (method1.equalsIgnoreCase(methodName) || method2.equalsIgnoreCase(methodName)) {
+                    // Found a ternary with our method! Now extract the params object that comes before it
+                    int ternaryStart = ternaryMatcher.start();
+
+                    // Search backwards for params:{...} in the same return statement
+                    String before = jsContent.substring(Math.max(0, ternaryStart - 1000), ternaryStart);
+
+                    // Find the params object (looking for the last occurrence before apexMethod)
+                    Pattern paramsPattern = Pattern.compile("params:\\s*\\{");
+                    Matcher paramsMatcher = paramsPattern.matcher(before);
+
+                    int lastParamsStart = -1;
+                    while (paramsMatcher.find()) {
+                        lastParamsStart = paramsMatcher.start();
+                    }
+
+                    if (lastParamsStart != -1) {
+                        // Extract the params object content
+                        int paramsObjStart = before.indexOf("{", lastParamsStart) + 1;
+                        int paramsObjEnd = findMatchingBraceInLWCCode(before, paramsObjStart - 1);
+
+                        if (paramsObjEnd != -1) {
+                            String paramsObject = before.substring(paramsObjStart, paramsObjEnd);
+                            extractLWCParamNames(paramsObject, paramNames);
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            api.logging().logToError("Error finding ternary method parameters: " + e.getMessage());
+        }
+
+        return new java.util.ArrayList<>(paramNames);
+    }
+
+    /**
+     * Find matching closing brace in LWC code
+     */
+    private int findMatchingBraceInLWCCode(String text, int openPos) {
+        int depth = 1;
+        for (int i = openPos + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Extract parameter names from an LWC object literal
+     */
+    private void extractLWCParamNames(String objectLiteral, java.util.Set<String> paramNames) {
+        Pattern keyPattern = Pattern.compile("([A-Za-z_$][\\w$]*)\\s*:");
+        Matcher keyMatcher = keyPattern.matcher(objectLiteral);
+
+        while (keyMatcher.find()) {
+            String paramName = keyMatcher.group(1);
+            if (!isJavaScriptKeyword(paramName)) {
+                paramNames.add(paramName);
+            }
+        }
     }
 
     /**
@@ -5199,12 +5356,7 @@ public class ActionsTab {
             DefaultListModel<String> modelToExport = filteredCategoryModel;
 
             if (modelToExport.isEmpty()) {
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "No categories to export. Please ensure there are items in the list.",
-                        "Nothing to Export",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
+                api.logging().logToOutput("No categories to export. Please ensure there are items in the list.");
                 return;
             }
 
@@ -5220,12 +5372,7 @@ public class ActionsTab {
 
             java.io.File exportFolder = folderChooser.getSelectedFile();
             if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Invalid folder selected for export.",
-                        "Export Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
+                api.logging().logToError("Invalid folder selected for export.");
                 return;
             }
 
@@ -5262,20 +5409,9 @@ public class ActionsTab {
                         }
                     }
 
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Export completed successfully!\nFiles saved to: " + exportFolder.getAbsolutePath(),
-                            "Export Successful",
-                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                    });
+                    api.logging().logToOutput("Export completed successfully! Files saved to: " + exportFolder.getAbsolutePath());
 
                 } catch (Exception e) {
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Error during export: " + e.getMessage(),
-                            "Export Error",
-                            javax.swing.JOptionPane.ERROR_MESSAGE);
-                    });
                 }
             });
         }
@@ -5630,24 +5766,10 @@ public class ActionsTab {
                             writer.write(exportContent.toString());
                         }
 
-                        SwingUtilities.invokeLater(() -> {
-                            JOptionPane.showMessageDialog(
-                                DiscoveredRoutesResultPanel.this,
-                                "Routes exported to: " + finalFile.getAbsolutePath(),
-                                "Export Complete",
-                                JOptionPane.INFORMATION_MESSAGE
-                            );
-                        });
+                        api.logging().logToOutput("Routes exported to: " + finalFile.getAbsolutePath());
 
                     } catch (Exception ex) {
-                        SwingUtilities.invokeLater(() -> {
-                            JOptionPane.showMessageDialog(
-                                DiscoveredRoutesResultPanel.this,
-                                "Failed to export routes: " + ex.getMessage(),
-                                "Export Error",
-                                JOptionPane.ERROR_MESSAGE
-                            );
-                        });
+                        api.logging().logToError("Failed to export routes: " + ex.getMessage());
                     }
                 }).start();
             });
@@ -6427,12 +6549,6 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Could not extract request ID from object name",
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
                 return;
             }
 
@@ -6457,12 +6573,6 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Could not extract request ID from object name",
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
                 return;
             }
 
@@ -6488,12 +6598,6 @@ public class ActionsTab {
             String requestId = extractRequestId(selectedObject);
             if (requestId == null) {
                 api.logging().logToError("Could not extract request ID from object name: " + selectedObject);
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Could not extract request ID from object name",
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
                 return;
             }
 
@@ -6515,12 +6619,6 @@ public class ActionsTab {
                 api.logging().logToOutput("HTTP request copied to clipboard for: " + selectedObject);
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy request to clipboard: " + e.getMessage());
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Failed to copy request to clipboard: " + e.getMessage(),
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
             }
         }
 
@@ -6564,12 +6662,6 @@ public class ActionsTab {
             }
 
             api.logging().logToError("Could not find BaseRequest with ID: " + requestId);
-            javax.swing.SwingUtilities.invokeLater(() -> {
-                javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                    "Could not find original request with ID: " + requestId,
-                    "Error",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
-            });
             return null;
         }
 
@@ -6720,12 +6812,6 @@ public class ActionsTab {
 
             } catch (Exception e) {
                 api.logging().logToError("Failed to send request to Repeater: " + e.getMessage());
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Failed to send request to Repeater: " + e.getMessage(),
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
             }
         }
 
@@ -6737,12 +6823,7 @@ public class ActionsTab {
             DefaultListModel<String> modelToExport = filteredObjectModel;
 
             if (modelToExport.isEmpty()) {
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "No objects to export. Please ensure there are items in the list.",
-                        "Nothing to Export",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
+                api.logging().logToOutput("No objects to export. Please ensure there are items in the list.");
                 return;
             }
 
@@ -6758,12 +6839,7 @@ public class ActionsTab {
 
             java.io.File exportFolder = folderChooser.getSelectedFile();
             if (exportFolder == null || !exportFolder.exists() || !exportFolder.isDirectory()) {
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Invalid folder selected for export.",
-                        "Export Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
+                api.logging().logToError("Invalid folder selected for export.");
                 return;
             }
 
@@ -6795,22 +6871,11 @@ public class ActionsTab {
                     }
 
                     final int finalExportedCount = exportedCount;
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Successfully exported " + finalExportedCount + " objects to:\n" + exportFolder.getAbsolutePath(),
-                            "Export Complete",
-                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                    });
+                    api.logging().logToOutput("Successfully exported " + finalExportedCount + " objects to: " + exportFolder.getAbsolutePath());
 
                     api.logging().logToOutput("Exported " + finalExportedCount + " objects to: " + exportFolder.getAbsolutePath());
 
                 } catch (Exception e) {
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Failed to export objects: " + e.getMessage(),
-                            "Export Error",
-                            javax.swing.JOptionPane.ERROR_MESSAGE);
-                    });
                     api.logging().logToError("Export failed: " + e.getMessage());
                 }
             });
@@ -6871,13 +6936,15 @@ public class ActionsTab {
         private final JSplitPane splitPane;
         private final JList<String> recordList;
         private final JTextArea dataArea;
-        private final BaseRequest baseRequest;
+        private final List<BaseRequest> baseRequests;
+        private final String requestId;
         private final MontoyaApi api;
 
-        public RetrievedRecordsResultPanel(String recordId, String recordData, BaseRequest baseRequest, MontoyaApi api) {
+        public RetrievedRecordsResultPanel(String recordId, String recordData, List<BaseRequest> baseRequests, String requestId, MontoyaApi api) {
             this.recordId = recordId;
             this.recordData = recordData;
-            this.baseRequest = baseRequest;
+            this.baseRequests = baseRequests;
+            this.requestId = requestId;
             this.api = api;
             this.setLayout(new BorderLayout());
 
@@ -6981,6 +7048,7 @@ public class ActionsTab {
                         javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
 
                         // Only show context menu items if we have baseRequest information
+                        BaseRequest baseRequest = findBaseRequestById(requestId);
                         if (baseRequest != null) {
                             javax.swing.JMenuItem showRequestItem = new javax.swing.JMenuItem("Show HTTP Request");
                             showRequestItem.addActionListener(action -> showHttpRequest());
@@ -6993,6 +7061,20 @@ public class ActionsTab {
                             javax.swing.JMenuItem copyRequestItem = new javax.swing.JMenuItem("Copy HTTP Request");
                             copyRequestItem.addActionListener(action -> copyHttpRequestToClipboard());
                             popup.add(copyRequestItem);
+
+                            popup.addSeparator();
+
+                            javax.swing.JMenuItem exportItem = new javax.swing.JMenuItem("Export");
+                            exportItem.addActionListener(action -> performExport());
+                            popup.add(exportItem);
+
+                            javax.swing.JMenuItem deleteItem = new javax.swing.JMenuItem("Delete");
+                            deleteItem.addActionListener(action -> performDelete());
+                            popup.add(deleteItem);
+
+                            javax.swing.JMenuItem copyAllItem = new javax.swing.JMenuItem("Copy all to clipboard");
+                            copyAllItem.addActionListener(action -> copyAllToClipboard());
+                            popup.add(copyAllItem);
                         } else {
                             // Show informational message when baseRequest is not available
                             javax.swing.JMenuItem noRequestItem = new javax.swing.JMenuItem("No request information available");
@@ -7043,38 +7125,6 @@ public class ActionsTab {
         }
 
         @Override
-        protected void performExport() {
-            // Export implementation
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            fileChooser.setDialogTitle("Select folder to export record data");
-
-            if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File selectedFolder = fileChooser.getSelectedFile();
-                String filename = sanitizeFilename(recordId) + ".txt";
-                File outputFile = new File(selectedFolder, filename);
-
-                try (java.io.FileWriter writer = new java.io.FileWriter(outputFile)) {
-                    writer.write("Record ID: " + recordId + "\n\n");
-                    writer.write(recordData);
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Record exported successfully to:\n" + outputFile.getAbsolutePath(),
-                            "Export Complete",
-                            javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                    });
-                } catch (Exception e) {
-                    javax.swing.SwingUtilities.invokeLater(() -> {
-                        javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                            "Export failed: " + e.getMessage(),
-                            "Export Error",
-                            javax.swing.JOptionPane.ERROR_MESSAGE);
-                    });
-                }
-            }
-        }
-
-        @Override
         protected void highlightCurrentMatch() {
             if (currentSearchIndex >= 0 && currentSearchIndex < searchMatches.size()) {
                 int matchStart = searchMatches.get(currentSearchIndex);
@@ -7115,6 +7165,7 @@ public class ActionsTab {
          */
         private void showHttpRequest() {
             String selectedRecord = recordList.getSelectedValue();
+            BaseRequest baseRequest = findBaseRequestById(requestId);
             if (selectedRecord == null || baseRequest == null) {
                 return;
             }
@@ -7129,6 +7180,7 @@ public class ActionsTab {
          */
         private void sendSelectedToRepeater() {
             String selectedRecord = recordList.getSelectedValue();
+            BaseRequest baseRequest = findBaseRequestById(requestId);
             if (selectedRecord == null || baseRequest == null) {
                 return;
             }
@@ -7143,6 +7195,7 @@ public class ActionsTab {
          */
         private void copyHttpRequestToClipboard() {
             String selectedRecord = recordList.getSelectedValue();
+            BaseRequest baseRequest = findBaseRequestById(requestId);
             if (selectedRecord == null || baseRequest == null) {
                 return;
             }
@@ -7156,20 +7209,9 @@ public class ActionsTab {
                 java.awt.datatransfer.StringSelection stringSelection = new java.awt.datatransfer.StringSelection(requestText);
                 java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
 
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "HTTP request copied to clipboard",
-                        "Copy Successful",
-                        javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                });
+                api.logging().logToOutput("HTTP request copied to clipboard");
             } catch (Exception e) {
                 api.logging().logToError("Failed to copy to clipboard: " + e.getMessage());
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Failed to copy to clipboard: " + e.getMessage(),
-                        "Copy Failed",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
             }
         }
 
@@ -7264,12 +7306,6 @@ public class ActionsTab {
                 api.logging().logToOutput("Sent record request " + requestId + " to Repeater");
             } catch (Exception e) {
                 api.logging().logToError("Failed to send to Repeater: " + e.getMessage());
-                javax.swing.SwingUtilities.invokeLater(() -> {
-                    javax.swing.JOptionPane.showMessageDialog(api.userInterface().swingUtils().suiteFrame(),
-                        "Failed to send to Repeater: " + e.getMessage(),
-                        "Error",
-                        javax.swing.JOptionPane.ERROR_MESSAGE);
-                });
             }
         }
 
@@ -7313,6 +7349,174 @@ public class ActionsTab {
                 dataArea.setCaretPosition(Math.min(position, dataArea.getText().length()));
             } catch (IllegalArgumentException e) {
                 dataArea.setCaretPosition(0);
+            }
+        }
+
+        /**
+         * Find BaseRequest by ID from the shared list
+         */
+        private BaseRequest findBaseRequestById(String requestIdStr) {
+            try {
+                int id = Integer.parseInt(requestIdStr);
+                for (BaseRequest request : baseRequests) {
+                    if (request.getId() == id) {
+                        return request;
+                    }
+                }
+            } catch (NumberFormatException e) {
+                api.logging().logToError("Invalid request ID format: " + requestIdStr);
+            }
+
+            api.logging().logToError("Could not find BaseRequest with ID: " + requestIdStr);
+            return null;
+        }
+
+        /**
+         * Perform export of retrieved records
+         */
+        @Override
+        protected void performExport() {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+                fileChooser.setDialogTitle("Export Retrieved Records");
+
+                // Add file filters
+                javax.swing.filechooser.FileNameExtensionFilter csvFilter =
+                    new javax.swing.filechooser.FileNameExtensionFilter("CSV Files (*.csv)", "csv");
+                javax.swing.filechooser.FileNameExtensionFilter jsonFilter =
+                    new javax.swing.filechooser.FileNameExtensionFilter("JSON Files (*.json)", "json");
+                javax.swing.filechooser.FileNameExtensionFilter txtFilter =
+                    new javax.swing.filechooser.FileNameExtensionFilter("Text Files (*.txt)", "txt");
+
+                fileChooser.addChoosableFileFilter(csvFilter);
+                fileChooser.addChoosableFileFilter(jsonFilter);
+                fileChooser.addChoosableFileFilter(txtFilter);
+                fileChooser.setFileFilter(csvFilter);
+
+                int result = fileChooser.showSaveDialog(this);
+                if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+                    java.io.File file = fileChooser.getSelectedFile();
+                    String fileName = file.getName();
+
+                    // Export based on selected filter
+                    try {
+                        if (fileChooser.getFileFilter() == csvFilter || fileName.endsWith(".csv")) {
+                            exportAsCSV(file);
+                        } else if (fileChooser.getFileFilter() == jsonFilter || fileName.endsWith(".json")) {
+                            exportAsJSON(file);
+                        } else {
+                            exportAsText(file);
+                        }
+                        api.logging().logToOutput("Exported retrieved records to: " + file.getAbsolutePath());
+                    } catch (Exception e) {
+                        api.logging().logToError("Failed to export: " + e.getMessage());
+                    }
+                }
+            });
+        }
+
+        /**
+         * Export records as CSV
+         */
+        private void exportAsCSV(java.io.File file) throws Exception {
+            try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
+                writer.println("Record ID,Data");
+                DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
+                for (int i = 0; i < model.getSize(); i++) {
+                    String id = model.getElementAt(i);
+                    String data = recordData.replace("\"", "\"\""); // Escape quotes for CSV
+                    writer.println("\"" + id + "\",\"" + data + "\"");
+                }
+            }
+        }
+
+        /**
+         * Export records as JSON
+         */
+        private void exportAsJSON(java.io.File file) throws Exception {
+            try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
+                writer.println("{");
+                writer.println("  \"records\": [");
+                DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
+                for (int i = 0; i < model.getSize(); i++) {
+                    String id = model.getElementAt(i);
+                    writer.println("    {");
+                    writer.println("      \"id\": \"" + id.replace("\"", "\\\"") + "\",");
+                    writer.println("      \"data\": " + recordData);
+                    writer.print("    }");
+                    if (i < model.getSize() - 1) {
+                        writer.println(",");
+                    } else {
+                        writer.println();
+                    }
+                }
+                writer.println("  ]");
+                writer.println("}");
+            }
+        }
+
+        /**
+         * Export records as plain text
+         */
+        private void exportAsText(java.io.File file) throws Exception {
+            try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
+                writer.println("Retrieved Records");
+                writer.println("=================");
+                writer.println();
+                DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
+                for (int i = 0; i < model.getSize(); i++) {
+                    String id = model.getElementAt(i);
+                    writer.println("Record ID: " + id);
+                    writer.println("Data:");
+                    writer.println(recordData);
+                    writer.println();
+                    writer.println("-----------------");
+                    writer.println();
+                }
+            }
+        }
+
+        /**
+         * Perform delete operation - remove this panel from the parent tabbed pane
+         */
+        private void performDelete() {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                java.awt.Container parent = this.getParent();
+                if (parent instanceof javax.swing.JTabbedPane) {
+                    javax.swing.JTabbedPane tabbedPane = (javax.swing.JTabbedPane) parent;
+                    int index = tabbedPane.indexOfComponent(this);
+                    if (index >= 0) {
+                        tabbedPane.removeTabAt(index);
+                        api.logging().logToOutput("Deleted retrieved records tab");
+                    }
+                }
+            });
+        }
+
+        /**
+         * Copy all retrieved records to clipboard
+         */
+        private void copyAllToClipboard() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Retrieved Records\n");
+            sb.append("=================\n\n");
+
+            DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
+            for (int i = 0; i < model.getSize(); i++) {
+                String id = model.getElementAt(i);
+                sb.append("Record ID: ").append(id).append("\n");
+                sb.append("Data:\n");
+                sb.append(recordData).append("\n");
+                sb.append("\n-----------------\n\n");
+            }
+
+            try {
+                java.awt.datatransfer.StringSelection stringSelection =
+                    new java.awt.datatransfer.StringSelection(sb.toString());
+                java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
+                api.logging().logToOutput("All retrieved records copied to clipboard");
+            } catch (Exception e) {
+                api.logging().logToError("Failed to copy all records to clipboard: " + e.getMessage());
             }
         }
     }

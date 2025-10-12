@@ -380,7 +380,7 @@ public class AuraditorSuiteTab {
             } else {
                 // Create new tab with context menu support
                 ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel =
-                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, baseRequest, api);
+                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, baseRequests, String.valueOf(baseRequest.getId()), api);
 
                 // Add the new result tab with the specific resultId name
                 resultsTabbedPane.addTab(resultId, retrievedRecordsPanel);
@@ -430,7 +430,7 @@ public class AuraditorSuiteTab {
             } else {
                 // Create new tab without context menu support (legacy method)
                 ActionsTab.RetrievedRecordsResultPanel retrievedRecordsPanel =
-                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, null, api);
+                    new ActionsTab.RetrievedRecordsResultPanel(recordId, recordData, baseRequests, null, api);
 
                 // Add the new result tab with a fixed name for accumulation
                 resultsTabbedPane.addTab("Retrieved Records", retrievedRecordsPanel);

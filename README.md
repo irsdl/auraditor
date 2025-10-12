@@ -26,10 +26,11 @@ Installs Aura tabs on HTTP message editors (Interceptor, Repeater, etc). Decodes
 ### Current Capabilities
 - **Aura Actions Tab** - Individual action editing with Controller/Method fields and JSON parameter editing
 - **Closeable Action Management** - Add/remove actions with intuitive tab interface
-- **Smart JSON Error Handling** - User choice dialogs for handling invalid JSON scenarios  
+- **Smart JSON Error Handling** - User choice dialogs for handling invalid JSON scenarios
 - **Enhanced Text Editing** - Context menu with Cut/Copy/Paste and line wrapping toggle
 - **Real-time Change Detection** - Immediate request updates when editing parameters
 - **Dark Mode Support** - Proper theme integration with Burp Suite
+- **LWC & Aura Descriptor Discovery** - Automatically extracts Apex controller methods and parameters from JavaScript files for both Lightning Web Components (LWC) and Aura framework applications
 
 ## Screenshots
 
@@ -94,6 +95,13 @@ In Burp Suite:
 - **Parameter Manipulation** - Edit controller, method, and JSON parameters with validation
 - **Invalid JSON Testing** - Option to send malformed JSON for edge case testing
 - **Request Modification** - Real-time request updates with immediate feedback
+- **Comprehensive Descriptor Discovery** - Extract Apex endpoints and parameters from both:
+  - **Aura Framework** - Traditional Lightning components and actions
+  - **Lightning Web Components (LWC)** - Modern web components with multiple detection strategies:
+    - Direct `.default({params})` call patterns
+    - Conditional/ternary call patterns
+    - Method reference patterns (cross-module usage)
+    - Ternary selection patterns (shared parameter objects)
 
 ## Contributors & Acknowledgments
 
