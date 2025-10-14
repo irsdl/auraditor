@@ -60,7 +60,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
         this.useBaseIdRadio = new JRadioButton("Use Base ID:", true);
         this.useIntruderRadio = new JRadioButton("Use Intruder Payload");
         this.baseIdField = new JTextField(20);
-        this.countSpinner = new JSpinner(new SpinnerNumberModel(100, 1, 1000000, 10));
+        this.countSpinner = new JSpinner(new SpinnerNumberModel(100, 1, 999999999, 10));
         this.upwardRadio = new JRadioButton("Upward", true);
         this.downwardRadio = new JRadioButton("Downward");
         this.use18CharCheckbox = new JCheckBox("Output 18-character IDs (default is 15-char)");
