@@ -93,45 +93,45 @@ public class AboutTab {
         gbc.gridx = 0;
         gbc.gridy = 0;
         JLabel versionTitleLabel = new JLabel("Version:");
-        versionTitleLabel.setFont(new Font(versionTitleLabel.getFont().getName(), Font.BOLD, 14));
+        versionTitleLabel.setFont(new Font(versionTitleLabel.getFont().getName(), Font.BOLD, 16));
         infoPanel.add(versionTitleLabel, gbc);
 
         gbc.gridx = 1;
         JLabel versionLabel = new JLabel(VERSION);
-        versionLabel.setFont(new Font(versionLabel.getFont().getName(), Font.PLAIN, 14));
+        versionLabel.setFont(new Font(versionLabel.getFont().getName(), Font.PLAIN, 15));
         infoPanel.add(versionLabel, gbc);
 
         // Author
         gbc.gridx = 0;
         gbc.gridy = 1;
         JLabel authorTitleLabel = new JLabel("Author:");
-        authorTitleLabel.setFont(new Font(authorTitleLabel.getFont().getName(), Font.BOLD, 14));
+        authorTitleLabel.setFont(new Font(authorTitleLabel.getFont().getName(), Font.BOLD, 16));
         infoPanel.add(authorTitleLabel, gbc);
 
         gbc.gridx = 1;
-        JLabel authorLabel = createHyperlinkLabel(AUTHOR, AUTHOR_URL);
+        JLabel authorLabel = createHyperlinkLabel(AUTHOR, AUTHOR_URL, 15);
         infoPanel.add(authorLabel, gbc);
 
         // GitHub Project
         gbc.gridx = 0;
         gbc.gridy = 2;
         JLabel githubTitleLabel = new JLabel("GitHub:");
-        githubTitleLabel.setFont(new Font(githubTitleLabel.getFont().getName(), Font.BOLD, 14));
+        githubTitleLabel.setFont(new Font(githubTitleLabel.getFont().getName(), Font.BOLD, 16));
         infoPanel.add(githubTitleLabel, gbc);
 
         gbc.gridx = 1;
-        JLabel githubLabel = createHyperlinkLabel(GITHUB_URL, GITHUB_URL);
+        JLabel githubLabel = createHyperlinkLabel(GITHUB_URL, GITHUB_URL, 15);
         infoPanel.add(githubLabel, gbc);
 
         // Report Issue
         gbc.gridx = 0;
         gbc.gridy = 3;
         JLabel issuesTitleLabel = new JLabel("Report Issue:");
-        issuesTitleLabel.setFont(new Font(issuesTitleLabel.getFont().getName(), Font.BOLD, 14));
+        issuesTitleLabel.setFont(new Font(issuesTitleLabel.getFont().getName(), Font.BOLD, 16));
         infoPanel.add(issuesTitleLabel, gbc);
 
         gbc.gridx = 1;
-        JLabel issuesLabel = createHyperlinkLabel("Submit an issue on GitHub", ISSUES_URL);
+        JLabel issuesLabel = createHyperlinkLabel("Submit an issue on GitHub", ISSUES_URL, 15);
         infoPanel.add(issuesLabel, gbc);
 
         contentPanel.add(infoPanel);
@@ -157,9 +157,9 @@ public class AboutTab {
     /**
      * Create a clickable hyperlink label (without HTML)
      */
-    private JLabel createHyperlinkLabel(String text, String url) {
+    private JLabel createHyperlinkLabel(String text, String url, int fontSize) {
         JLabel label = new JLabel(text);
-        label.setFont(new Font(label.getFont().getName(), Font.PLAIN, 14));
+        label.setFont(new Font(label.getFont().getName(), Font.PLAIN, fontSize));
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         label.setForeground(new Color(0, 102, 204)); // Blue color for links
 

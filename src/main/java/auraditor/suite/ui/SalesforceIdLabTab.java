@@ -42,7 +42,7 @@ public class SalesforceIdLabTab {
         // Create results area
         this.resultsArea = new JTextArea();
         this.resultsArea.setEditable(false);
-        this.resultsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        this.resultsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         this.resultsArea.setLineWrap(false);
         this.resultsArea.setWrapStyleWord(false);
 
@@ -71,15 +71,15 @@ public class SalesforceIdLabTab {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
 
         JLabel label = new JLabel("Salesforce ID:");
-        label.setFont(new Font(label.getFont().getName(), Font.BOLD, 12));
+        label.setFont(new Font(label.getFont().getName(), Font.BOLD, 14));
         panel.add(label);
 
         JTextField textField = new JTextField(25);
-        textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         panel.add(textField);
 
         JButton button = new JButton("Analyze");
-        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 12));
+        button.setFont(new Font(button.getFont().getName(), Font.BOLD, 14));
         panel.add(button);
 
         return panel;

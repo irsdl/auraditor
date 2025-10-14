@@ -202,9 +202,9 @@ public class SalesforceIdAnalyzer {
     }
 
     /**
-     * Format a long number with thousand separators
+     * Format a long number as plain string without separators
      */
     public static String formatNumber(long number) {
-        return String.format("%,d", number);
+        return String.valueOf(number);
     }
 }
