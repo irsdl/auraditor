@@ -4,7 +4,7 @@
 
 # Auraditor
 
-A professional Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
+A Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
 
 Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))** for modern security testing professionals.
 
