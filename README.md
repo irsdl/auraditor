@@ -139,9 +139,17 @@ JAR files include the full version: `auraditor-2.0.1.jar`
 ## Additional Resources & Inspiration
 
 ### Recommended Reading
+
+**Security Testing Guides:**
 - [**Salesforce Penetration Testing Fundamentals**](https://projectblack.io/blog/salesforce-penetration-testing-fundamentals/) - Comprehensive guide to Salesforce security testing methodologies
 - [**Exposing Broken Access Controls in Salesforce-based Applications**](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/) - In-depth analysis of access control vulnerabilities in Salesforce applications
 - [**Misconfigured Salesforce Experiences**](https://www.varonis.com/blog/misconfigured-salesforce-experiences) - Common misconfigurations and security issues in Salesforce implementations
+
+**Salesforce ID Technical References:**
+- [**Salesforce IDs Explained**](https://codebycody.com/salesforce-ids-explained/) - Detailed explanation of Salesforce ID structure and format
+- [**Salesforce's Algorithm for Converting IDs from 15 to 18 Characters**](https://codebycody.com/salesforces-algorithm-for-converting-ids-from-15-to-18-characters/) - Checksum algorithm breakdown
+- [**Salesforce Object Key Prefixes**](https://help.salesforce.com/s/articleView?id=000385203&type=1) - Official Salesforce documentation on object prefixes
+- [**Obscure Salesforce Object Key Prefixes**](https://www.fishofprey.com/2011/09/obscure-salesforce-object-key-prefixes.html) - Additional object prefix reference
 
 ### Acknowledgments
 Special thanks to the following projects for inspiration and advancing Salesforce security testing:
