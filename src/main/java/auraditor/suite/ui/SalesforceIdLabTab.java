@@ -70,7 +70,10 @@ class SalesforceIdAnalysisPanel {
     private final JPanel mainPanel;
     private final JTextField idTextField;
     private final JButton analyzeButton;
+    private final JTextField decimalTextField;
+    private final JButton changeDecimalButton;
     private final JTextArea resultsArea;
+    private SalesforceIdAnalyzer.AnalysisResult lastAnalysisResult = null;
 
     public SalesforceIdAnalysisPanel(MontoyaApi api) {
         this.api = api;
@@ -97,13 +100,30 @@ class SalesforceIdAnalysisPanel {
 
         this.mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // Wire up button action
+        // Wire up controls
         this.idTextField = (JTextField) inputPanel.getComponent(1);
         this.analyzeButton = (JButton) inputPanel.getComponent(2);
+        this.decimalTextField = (JTextField) inputPanel.getComponent(4);
+        this.changeDecimalButton = (JButton) inputPanel.getComponent(5);
+
+        // Wire up analyze button
         this.analyzeButton.addActionListener(e -> performAnalysis());
 
-        // Allow Enter key in text field to trigger analysis
+        // Allow Enter key in ID text field to trigger analysis
         this.idTextField.addActionListener(e -> performAnalysis());
+
+        // Add text change listener to ID field to disable decimal controls
+        this.idTextField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { onIdTextChanged(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { onIdTextChanged(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { onIdTextChanged(); }
+        });
+
+        // Wire up decimal change button
+        this.changeDecimalButton.addActionListener(e -> performDecimalChange());
+
+        // Allow Enter key in decimal field to trigger change
+        this.decimalTextField.addActionListener(e -> performDecimalChange());
     }
 
     /**
@@ -123,6 +143,21 @@ class SalesforceIdAnalysisPanel {
         JButton button = new JButton("Analyze");
         button.setFont(new Font(button.getFont().getName(), Font.BOLD, 14));
         panel.add(button);
+
+        // Add decimal ID change controls
+        JLabel decimalLabel = new JLabel("Decimal ID:");
+        decimalLabel.setFont(new Font(label.getFont().getName(), Font.BOLD, 14));
+        panel.add(decimalLabel);
+
+        JTextField decimalField = new JTextField(15);
+        decimalField.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        decimalField.setEnabled(false);
+        panel.add(decimalField);
+
+        JButton changeButton = new JButton("Change Decimal ID");
+        changeButton.setFont(new Font(button.getFont().getName(), Font.BOLD, 14));
+        changeButton.setEnabled(false);
+        panel.add(changeButton);
 
         return panel;
     }
@@ -172,12 +207,97 @@ class SalesforceIdAnalysisPanel {
         // Display results
         displayResults(result);
 
+        // Enable decimal controls if valid
+        if (result.valid) {
+            lastAnalysisResult = result;
+            decimalTextField.setEnabled(true);
+            changeDecimalButton.setEnabled(true);
+            decimalTextField.setText(String.valueOf(result.recordNumberDecimal));
+        }
+
         // Log to Burp
         if (result.valid) {
             api.logging().logToOutput("Analyzed Salesforce ID: " + input + " -> " + result.objectType);
         } else {
             api.logging().logToOutput("Invalid Salesforce ID: " + input + " -> " + result.errorMessage);
         }
+    }
+
+    /**
+     * Called when ID text field changes - disable decimal controls
+     */
+    private void onIdTextChanged() {
+        decimalTextField.setEnabled(false);
+        changeDecimalButton.setEnabled(false);
+        decimalTextField.setText("");
+        lastAnalysisResult = null;
+    }
+
+    /**
+     * Perform decimal ID change when button is clicked
+     */
+    private void performDecimalChange() {
+        if (lastAnalysisResult == null || !lastAnalysisResult.valid) {
+            return;
+        }
+
+        String decimalText = decimalTextField.getText().trim();
+        if (decimalText.isEmpty()) {
+            api.logging().logToError("Decimal ID cannot be empty");
+            return;
+        }
+
+        // Parse and validate decimal value
+        long newDecimal;
+        try {
+            newDecimal = Long.parseLong(decimalText.replace(",", ""));
+        } catch (NumberFormatException e) {
+            api.logging().logToError("Invalid decimal number: " + decimalText);
+            return;
+        }
+
+        // Validate bounds
+        if (newDecimal < 0 || newDecimal > SalesforceIdAnalyzer.MAX_BASE62_8) {
+            api.logging().logToError("Decimal ID out of bounds (0 to " +
+                SalesforceIdAnalyzer.formatNumber(SalesforceIdAnalyzer.MAX_BASE62_8) + ")");
+            return;
+        }
+
+        // Generate new ID with the new decimal value
+        String prefix7 = lastAnalysisResult.id15.substring(0, 7);
+        String newRecordBase62 = decimalToBase62(newDecimal, 8);
+        String newId15 = prefix7 + newRecordBase62;
+
+        // Generate 18-char version if original was 18-char
+        String newId = lastAnalysisResult.is18Char ?
+            SalesforceIdAnalyzer.computeId18(newId15) : newId15;
+
+        // Update ID field and trigger analysis
+        idTextField.setText(newId);
+        performAnalysis();
+
+        api.logging().logToOutput("Changed decimal ID to " + newDecimal + " -> " + newId);
+    }
+
+    /**
+     * Convert decimal to Base62 string with fixed length
+     */
+    private String decimalToBase62(long decimal, int length) {
+        String alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        StringBuilder result = new StringBuilder();
+
+        long value = decimal;
+        while (value > 0) {
+            result.insert(0, alphabet.charAt((int)(value % 62)));
+            value /= 62;
+        }
+
+        // Pad with zeros to reach desired length
+        while (result.length() < length) {
+            result.insert(0, '0');
+        }
+
+        return result.toString();
     }
 
     /**
@@ -192,6 +312,12 @@ class SalesforceIdAnalysisPanel {
             output.append("✗ INVALID SALESFORCE ID\n");
             output.append("✗ ").append(result.errorMessage).append("\n");
             resultsArea.setText(output.toString());
+
+            // Disable decimal controls for invalid ID
+            decimalTextField.setEnabled(false);
+            changeDecimalButton.setEnabled(false);
+            decimalTextField.setText("");
+            lastAnalysisResult = null;
             return;
         }
 
