@@ -11,14 +11,11 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Tab for analyzing Salesforce IDs (15 or 18 character format)
+ * Tab for Salesforce ID utilities with multiple sub-tabs
  *
- * Features:
- * - Validates ID length (15 or 18 characters)
- * - Computes and validates 18-char checksum
- * - Displays object prefix, instance ID, and record number
- * - Converts record number from Base62 to decimal
- * - Identifies common object types from prefix
+ * Sub-tabs:
+ * - ID Analysis: Analyze 15/18 character Salesforce IDs
+ * - Payload Generators: Generate payloads for testing (future implementation)
  *
  * Reference: https://codebycody.com/salesforce-ids-explained/
  */
@@ -26,11 +23,68 @@ public class SalesforceIdLabTab {
 
     private final MontoyaApi api;
     private final JPanel mainPanel;
+    private final JTabbedPane tabbedPane;
+
+    public SalesforceIdLabTab(MontoyaApi api) {
+        this.api = api;
+        this.mainPanel = new JPanel(new BorderLayout());
+
+        // Create tabbed pane for sub-tabs
+        this.tabbedPane = new JTabbedPane();
+
+        // Add ID Analysis sub-tab
+        SalesforceIdAnalysisPanel idAnalysisPanel = new SalesforceIdAnalysisPanel(api);
+        this.tabbedPane.addTab("ID Analysis", idAnalysisPanel.getComponent());
+
+        // Add Payload Generators sub-tab (placeholder for future)
+        JPanel payloadGeneratorsPanel = createPayloadGeneratorsPlaceholder();
+        this.tabbedPane.addTab("Payload Generators", payloadGeneratorsPanel);
+
+        this.mainPanel.add(tabbedPane, BorderLayout.CENTER);
+    }
+
+    /**
+     * Create placeholder panel for Payload Generators (future implementation)
+     */
+    private JPanel createPayloadGeneratorsPlaceholder() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+
+        JLabel placeholderLabel = new JLabel("Payload Generators - Coming Soon");
+        placeholderLabel.setFont(new Font(placeholderLabel.getFont().getName(), Font.BOLD, 16));
+        placeholderLabel.setForeground(Color.GRAY);
+
+        panel.add(placeholderLabel);
+        return panel;
+    }
+
+    /**
+     * Get the main UI component for this tab
+     */
+    public JComponent getComponent() {
+        return mainPanel;
+    }
+}
+
+/**
+ * Panel for analyzing Salesforce IDs (15 or 18 character format)
+ *
+ * Features:
+ * - Validates ID length (15 or 18 characters)
+ * - Computes and validates 18-char checksum
+ * - Displays object prefix, instance ID, and record number
+ * - Converts record number from Base62 to decimal
+ * - Identifies common object types from prefix
+ */
+class SalesforceIdAnalysisPanel {
+
+    private final MontoyaApi api;
+    private final JPanel mainPanel;
     private final JTextField idTextField;
     private final JButton analyzeButton;
     private final JTextArea resultsArea;
 
-    public SalesforceIdLabTab(MontoyaApi api) {
+    public SalesforceIdAnalysisPanel(MontoyaApi api) {
         this.api = api;
         this.mainPanel = new JPanel(new BorderLayout(10, 10));
         this.mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
@@ -90,7 +144,7 @@ public class SalesforceIdLabTab {
      */
     private void showHelpText() {
         resultsArea.setText(
-            "Salesforce Id Lab - Analyze 15 or 18 character Salesforce IDs\n" +
+            "Salesforce ID Lab - Analyze 15 or 18 character Salesforce IDs\n" +
             "================================================================\n\n" +
             "Enter a Salesforce ID above and click 'Analyze' to see:\n\n" +
             "  • ID validation (15 or 18 characters)\n" +
@@ -104,6 +158,13 @@ public class SalesforceIdLabTab {
             "  18-char: 001Vc00000PHoN1IAL\n\n" +
             "Reference: https://codebycody.com/salesforce-ids-explained/"
         );
+    }
+
+    /**
+     * Get the main UI component for this panel
+     */
+    public JComponent getComponent() {
+        return mainPanel;
     }
 
     /**
@@ -193,12 +254,5 @@ public class SalesforceIdLabTab {
         }
 
         resultsArea.setText(output.toString());
-    }
-
-    /**
-     * Get the main UI component for this tab
-     */
-    public JComponent getComponent() {
-        return mainPanel;
     }
 }
