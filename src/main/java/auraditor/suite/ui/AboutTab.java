@@ -12,6 +12,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.net.URI;
+import java.net.URL;
 
 /**
  * Tab displaying information about the Auraditor extension
@@ -25,14 +26,16 @@ public class AboutTab {
     private static final String EXTENSION_NAME = "Auraditor";
     private static final String VERSION = "2.0.3";
     private static final String AUTHOR = "Soroush Dalili (@irsdl)";
+    private static final String AUTHOR_URL = "https://x.com/irsdl";
     private static final String GITHUB_URL = "https://github.com/irsdl/auraditor";
     private static final String ISSUES_URL = "https://github.com/irsdl/auraditor/issues";
     private static final String DESCRIPTION = "Professional Burp Suite extension for Lightning/Aura framework security testing";
 
     public AboutTab(MontoyaApi api) {
         this.api = api;
-        this.mainPanel = new JPanel();
-        this.mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+
+        // Main panel with centered content
+        this.mainPanel = new JPanel(new GridBagLayout());
         this.mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
         createAboutPanel();
@@ -42,19 +45,41 @@ public class AboutTab {
      * Create the about panel with extension information
      */
     private void createAboutPanel() {
+        // Container for centered content
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+
+        // Logo
+        try {
+            URL logoUrl = getClass().getResource("/logo.png");
+            if (logoUrl != null) {
+                ImageIcon originalIcon = new ImageIcon(logoUrl);
+                // Scale logo to reasonable size (e.g., 150x150)
+                Image scaledImage = originalIcon.getImage().getScaledInstance(150, 150, Image.SCALE_SMOOTH);
+                ImageIcon logoIcon = new ImageIcon(scaledImage);
+                JLabel logoLabel = new JLabel(logoIcon);
+                logoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                contentPanel.add(logoLabel);
+                contentPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+            }
+        } catch (Exception e) {
+            // Logo loading failed, continue without it
+            api.logging().logToError("Failed to load logo: " + e.getMessage());
+        }
+
         // Title
         JLabel titleLabel = new JLabel(EXTENSION_NAME);
-        titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 28));
+        titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 32));
         titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        mainPanel.add(titleLabel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        contentPanel.add(titleLabel);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
 
         // Description
         JLabel descLabel = new JLabel(DESCRIPTION);
-        descLabel.setFont(new Font(descLabel.getFont().getName(), Font.PLAIN, 12));
+        descLabel.setFont(new Font(descLabel.getFont().getName(), Font.PLAIN, 13));
         descLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        mainPanel.add(descLabel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 30)));
+        contentPanel.add(descLabel);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 30)));
 
         // Information panel
         JPanel infoPanel = new JPanel();
@@ -84,8 +109,7 @@ public class AboutTab {
         infoPanel.add(authorTitleLabel, gbc);
 
         gbc.gridx = 1;
-        JLabel authorLabel = new JLabel(AUTHOR);
-        authorLabel.setFont(new Font(authorLabel.getFont().getName(), Font.PLAIN, 14));
+        JLabel authorLabel = createHyperlinkLabel(AUTHOR, AUTHOR_URL);
         infoPanel.add(authorLabel, gbc);
 
         // GitHub Project
@@ -110,61 +134,38 @@ public class AboutTab {
         JLabel issuesLabel = createHyperlinkLabel("Submit an issue on GitHub", ISSUES_URL);
         infoPanel.add(issuesLabel, gbc);
 
-        mainPanel.add(infoPanel);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 30)));
-
-        // Features section
-        JLabel featuresTitle = new JLabel("Key Features:");
-        featuresTitle.setFont(new Font(featuresTitle.getFont().getName(), Font.BOLD, 16));
-        featuresTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-        mainPanel.add(featuresTitle);
-        mainPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-
-        String[] features = {
-            "• Aura Actions Tab - Individual action editing with Controller/Method fields",
-            "• Closeable Action Management - Add/remove actions with intuitive tab interface",
-            "• Smart JSON Error Handling - User choice dialogs for invalid JSON scenarios",
-            "• Enhanced Text Editing - Context menu with Cut/Copy/Paste and line wrapping",
-            "• Real-time Change Detection - Immediate request updates when editing",
-            "• Dark Mode Support - Proper theme integration with Burp Suite",
-            "• LWC & Aura Descriptor Discovery - Extract Apex methods from JavaScript files"
-        };
-
-        JPanel featuresPanel = new JPanel();
-        featuresPanel.setLayout(new BoxLayout(featuresPanel, BoxLayout.Y_AXIS));
-        featuresPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-        for (String feature : features) {
-            JLabel featureLabel = new JLabel(feature);
-            featureLabel.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
-            featureLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            featuresPanel.add(featureLabel);
-            featuresPanel.add(Box.createRigidArea(new Dimension(0, 3)));
-        }
-
-        mainPanel.add(featuresPanel);
-
-        // Add vertical glue to push content to top
-        mainPanel.add(Box.createVerticalGlue());
+        contentPanel.add(infoPanel);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 30)));
 
         // Footer
         JLabel footerLabel = new JLabel("Licensed under BSD 3-Clause License");
-        footerLabel.setFont(new Font(footerLabel.getFont().getName(), Font.ITALIC, 10));
+        footerLabel.setFont(new Font(footerLabel.getFont().getName(), Font.ITALIC, 11));
         footerLabel.setForeground(Color.GRAY);
         footerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        mainPanel.add(footerLabel);
+        contentPanel.add(footerLabel);
+
+        // Add content panel to main panel (centered)
+        GridBagConstraints mainGbc = new GridBagConstraints();
+        mainGbc.gridx = 0;
+        mainGbc.gridy = 0;
+        mainGbc.weightx = 1.0;
+        mainGbc.weighty = 1.0;
+        mainGbc.anchor = GridBagConstraints.CENTER;
+        mainPanel.add(contentPanel, mainGbc);
     }
 
     /**
-     * Create a clickable hyperlink label
+     * Create a clickable hyperlink label (without HTML)
      */
     private JLabel createHyperlinkLabel(String text, String url) {
-        JLabel label = new JLabel("<html><a href=''>" + text + "</a></html>");
+        JLabel label = new JLabel(text);
         label.setFont(new Font(label.getFont().getName(), Font.PLAIN, 14));
         label.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         label.setForeground(new Color(0, 102, 204)); // Blue color for links
 
         label.addMouseListener(new MouseAdapter() {
+            private String originalText = text;
+
             @Override
             public void mouseClicked(MouseEvent e) {
                 openURL(url);
@@ -172,12 +173,16 @@ public class AboutTab {
 
             @Override
             public void mouseEntered(MouseEvent e) {
-                label.setText("<html><a href=''><u>" + text + "</u></a></html>");
+                // Show underline by changing font
+                Font currentFont = label.getFont();
+                label.setFont(currentFont.deriveFont(currentFont.getStyle() | Font.ITALIC));
             }
 
             @Override
             public void mouseExited(MouseEvent e) {
-                label.setText("<html><a href=''>" + text + "</a></html>");
+                // Remove underline by resetting font
+                Font currentFont = label.getFont();
+                label.setFont(currentFont.deriveFont(currentFont.getStyle() & ~Font.ITALIC));
             }
         });
 
