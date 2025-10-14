@@ -46,6 +46,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
     private boolean updatingUI = false;
     private int selectedIndex = -1;
+    private SwingWorker<Void, Integer> currentOutputWorker = null;
 
     public SalesforceIdPayloadGeneratorsPanel(MontoyaApi api, SalesforceIdGeneratorManager manager) {
         this.api = api;
@@ -477,20 +478,68 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         File file = fileChooser.getSelectedFile();
 
-        // Generate and output in background
-        SwingWorker<Void, Integer> worker = new SwingWorker<Void, Integer>() {
+        // Create cancel button
+        JButton cancelButton = new JButton("Cancel Output");
+        cancelButton.addActionListener(e -> {
+            if (currentOutputWorker != null && !currentOutputWorker.isDone()) {
+                currentOutputWorker.cancel(true);
+                statusLabel.setText("Cancelling...");
+            }
+        });
+
+        // Show cancel button in status area temporarily
+        Container statusParent = statusLabel.getParent();
+        statusParent.add(cancelButton);
+        statusParent.revalidate();
+        statusParent.repaint();
+
+        // Generate and output in background with streaming and progress
+        currentOutputWorker = new SwingWorker<Void, Integer>() {
             @Override
             protected Void doInBackground() throws Exception {
-                List<String> ids = SalesforceIdAnalyzer.generateSequence(
-                        gen.getBaseId(),
-                        gen.getCount(),
-                        gen.isUpward(),
-                        gen.isGenerate18Char()
-                );
+                // Normalize to 15 chars
+                String id15 = SalesforceIdAnalyzer.normalize15(gen.getBaseId());
+
+                // Extract prefix7 and record number
+                String prefix7 = id15.substring(0, 7);
+                String counter8 = id15.substring(7, 15);
+                long startValue = base62ToDecimal(counter8);
+
+                // Generate sequence with streaming (no memory buildup)
+                int step = gen.isUpward() ? 1 : -1;
+                long current = startValue;
 
                 try (FileWriter writer = new FileWriter(file)) {
-                    for (String id : ids) {
-                        writer.write(id + "\n");
+                    for (int i = 0; i < gen.getCount(); i++) {
+                        // Check cancellation
+                        if (isCancelled()) {
+                            break;
+                        }
+
+                        // Check bounds
+                        if (current < 0 || current > SalesforceIdAnalyzer.MAX_BASE62_8) {
+                            break;
+                        }
+
+                        // Generate single ID
+                        String base62 = decimalToBase62(current, 8);
+                        String newId15 = prefix7 + base62;
+
+                        String idToWrite;
+                        if (gen.isGenerate18Char()) {
+                            idToWrite = SalesforceIdAnalyzer.computeId18(newId15);
+                        } else {
+                            idToWrite = newId15;
+                        }
+
+                        writer.write(idToWrite + "\n");
+
+                        current += step;
+
+                        // Publish progress every 1000 IDs
+                        if (i % 1000 == 0 || i == gen.getCount() - 1) {
+                            publish(i + 1);
+                        }
                     }
                 }
 
@@ -498,19 +547,85 @@ public class SalesforceIdPayloadGeneratorsPanel {
             }
 
             @Override
+            protected void process(List<Integer> chunks) {
+                // Update UI with latest progress
+                Integer progress = chunks.get(chunks.size() - 1);
+                int percentage = (int) ((progress * 100.0) / gen.getCount());
+                statusLabel.setText(String.format("Outputting: %,d / %,d (%d%%)",
+                        progress, gen.getCount(), percentage));
+            }
+
+            @Override
             protected void done() {
+                // Remove cancel button
+                statusParent.remove(cancelButton);
+                statusParent.revalidate();
+                statusParent.repaint();
+
                 try {
-                    get();
-                    api.logging().logToOutput("Output " + gen.getCount() + " IDs to: " + file.getAbsolutePath());
-                    statusLabel.setText("Output " + gen.getCount() + " IDs successfully");
+                    if (isCancelled()) {
+                        api.logging().logToOutput("Output cancelled by user");
+                        statusLabel.setText("Output cancelled");
+                    } else {
+                        get();
+                        api.logging().logToOutput("Output " + gen.getCount() + " IDs to: " + file.getAbsolutePath());
+                        statusLabel.setText(String.format("Output %,d IDs successfully", gen.getCount()));
+                    }
                 } catch (Exception e) {
                     api.logging().logToError("Error outputting: " + e.getMessage());
                     statusLabel.setText("Output failed: " + e.getMessage());
                 }
+
+                currentOutputWorker = null;
             }
         };
 
-        worker.execute();
+        currentOutputWorker.execute();
+    }
+
+    /**
+     * Convert Base62 string to decimal (long) - helper for streaming generation
+     */
+    private long base62ToDecimal(String base62) {
+        String alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        long result = 0;
+        for (char c : base62.toCharArray()) {
+            int index = alphabet.indexOf(c);
+            if (index == -1) {
+                throw new IllegalArgumentException("Invalid Base62 character: " + c);
+            }
+            result = result * 62 + index;
+        }
+        return result;
+    }
+
+    /**
+     * Convert decimal to Base62 string with padding - helper for streaming generation
+     */
+    private String decimalToBase62(long value, int minLength) {
+        String alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        if (value < 0) {
+            throw new IllegalArgumentException("Only non-negative values are supported");
+        }
+
+        if (value == 0) {
+            return "0".repeat(Math.max(0, minLength));
+        }
+
+        StringBuilder result = new StringBuilder();
+        long n = value;
+        while (n > 0) {
+            int remainder = (int) (n % 62);
+            result.insert(0, alphabet.charAt(remainder));
+            n = n / 62;
+        }
+
+        // Pad with zeros to minimum length
+        while (result.length() < minLength) {
+            result.insert(0, '0');
+        }
+
+        return result.toString();
     }
 
     private void exportConfigs() {
