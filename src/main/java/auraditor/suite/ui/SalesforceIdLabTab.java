@@ -15,7 +15,7 @@ import java.awt.*;
  *
  * Sub-tabs:
  * - ID Analysis: Analyze 15/18 character Salesforce IDs
- * - Payload Generators: Manage Burp Intruder payload generators
+ * - Payload ID Generators: Manage Burp Intruder payload ID generators
  *
  * Reference: https://codebycody.com/salesforce-ids-explained/
  */
@@ -38,10 +38,10 @@ public class SalesforceIdLabTab {
         SalesforceIdAnalysisPanel idAnalysisPanel = new SalesforceIdAnalysisPanel(api);
         this.tabbedPane.addTab("ID Analysis", idAnalysisPanel.getComponent());
 
-        // Add Payload Generators sub-tab
+        // Add Payload ID Generators sub-tab
         SalesforceIdPayloadGeneratorsPanel payloadGeneratorsPanel =
             new SalesforceIdPayloadGeneratorsPanel(api, generatorManager);
-        this.tabbedPane.addTab("Payload Generators", payloadGeneratorsPanel.getComponent());
+        this.tabbedPane.addTab("Payload ID Generators", payloadGeneratorsPanel.getComponent());
 
         this.mainPanel.add(tabbedPane, BorderLayout.CENTER);
     }
