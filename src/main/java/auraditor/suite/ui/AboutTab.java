@@ -67,13 +67,6 @@ public class AboutTab {
             api.logging().logToError("Failed to load logo: " + e.getMessage());
         }
 
-        // Title
-        JLabel titleLabel = new JLabel(EXTENSION_NAME);
-        titleLabel.setFont(new Font(titleLabel.getFont().getName(), Font.BOLD, 32));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        contentPanel.add(titleLabel);
-        contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
-
         // Description
         JLabel descLabel = new JLabel(DESCRIPTION);
         descLabel.setFont(new Font(descLabel.getFont().getName(), Font.PLAIN, 13));
