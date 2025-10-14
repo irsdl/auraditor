@@ -10,6 +10,7 @@ import auraditor.requesteditor.ui.AuraActionsTabFactory;
 import auraditor.requesteditor.ui.AuraContextTabFactory;
 import auraditor.suite.ui.AuraditorContextMenuProvider;
 import auraditor.suite.ui.AuraditorSuiteTab;
+import auraditor.suite.ui.SalesforceIdGeneratorManager;
 import auraditor.core.ThreadManager;
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
@@ -17,6 +18,7 @@ import burp.api.montoya.MontoyaApi;
 public class BurpExtender implements BurpExtension {
 
 	private AuraditorSuiteTab auraditorSuiteTab;
+	private SalesforceIdGeneratorManager generatorManager;
 	private MontoyaApi api;
 
 	@Override
@@ -41,9 +43,13 @@ public class BurpExtender implements BurpExtension {
 		api.userInterface().registerHttpRequestEditorProvider(contextFactory);
 		api.userInterface().registerHttpResponseEditorProvider(contextFactory);
 
+		// Initialize Salesforce ID Generator Manager
+		api.logging().logToOutput("Initializing Salesforce ID Generator Manager...");
+		generatorManager = new SalesforceIdGeneratorManager(api);
+
 		// Create and register the main Auraditor suite tab
 		api.logging().logToOutput("Creating Auraditor Suite Tab...");
-		auraditorSuiteTab = new AuraditorSuiteTab(api);
+		auraditorSuiteTab = new AuraditorSuiteTab(api, generatorManager);
 		api.userInterface().registerSuiteTab("Auraditor", auraditorSuiteTab.getComponent());
 		api.logging().logToOutput("Auraditor Suite Tab registered successfully");
 
@@ -70,6 +76,11 @@ public class BurpExtender implements BurpExtension {
 		try {
 			// Stop all threads managed by ThreadManager
 			ThreadManager.shutdown();
+
+			// Cleanup generator manager
+			if (generatorManager != null) {
+				generatorManager.cleanup();
+			}
 
 			// Cleanup the main suite tab
 			if (auraditorSuiteTab != null) {

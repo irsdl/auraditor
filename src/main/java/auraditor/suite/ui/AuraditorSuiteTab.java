@@ -21,7 +21,7 @@ import java.util.List;
  * Main Auraditor suite tab providing comprehensive Lightning/Aura auditing capabilities
  */
 public class AuraditorSuiteTab {
-    
+
     private final MontoyaApi api;
     private final JPanel mainPanel;
     private final JTabbedPane tabbedPane;
@@ -30,9 +30,11 @@ public class AuraditorSuiteTab {
     private final List<BaseRequest> baseRequests;
     private final JTabbedPane resultsTabbedPane;
     private final java.util.Map<String, ActionsTab.ObjectByNameResultPanel> existingObjectPanels;
-    
-    public AuraditorSuiteTab(MontoyaApi api) {
+    private final SalesforceIdGeneratorManager generatorManager;
+
+    public AuraditorSuiteTab(MontoyaApi api, SalesforceIdGeneratorManager generatorManager) {
         this.api = api;
+        this.generatorManager = generatorManager;
         this.baseRequests = new ArrayList<>();
         this.existingObjectPanels = new java.util.HashMap<>();
         
@@ -102,7 +104,7 @@ public class AuraditorSuiteTab {
         });
 
         // Create and add Salesforce ID Lab tab
-        SalesforceIdLabTab salesforceIdLabTab = new SalesforceIdLabTab(api);
+        SalesforceIdLabTab salesforceIdLabTab = new SalesforceIdLabTab(api, generatorManager);
         this.tabbedPane.addTab("Salesforce ID Lab", salesforceIdLabTab.getComponent());
 
         // Add placeholder tab for future functionality

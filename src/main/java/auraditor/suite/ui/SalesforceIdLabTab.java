@@ -15,7 +15,7 @@ import java.awt.*;
  *
  * Sub-tabs:
  * - ID Analysis: Analyze 15/18 character Salesforce IDs
- * - Payload Generators: Generate payloads for testing (future implementation)
+ * - Payload Generators: Manage Burp Intruder payload generators
  *
  * Reference: https://codebycody.com/salesforce-ids-explained/
  */
@@ -24,9 +24,11 @@ public class SalesforceIdLabTab {
     private final MontoyaApi api;
     private final JPanel mainPanel;
     private final JTabbedPane tabbedPane;
+    private final SalesforceIdGeneratorManager generatorManager;
 
-    public SalesforceIdLabTab(MontoyaApi api) {
+    public SalesforceIdLabTab(MontoyaApi api, SalesforceIdGeneratorManager generatorManager) {
         this.api = api;
+        this.generatorManager = generatorManager;
         this.mainPanel = new JPanel(new BorderLayout());
 
         // Create tabbed pane for sub-tabs
@@ -36,26 +38,12 @@ public class SalesforceIdLabTab {
         SalesforceIdAnalysisPanel idAnalysisPanel = new SalesforceIdAnalysisPanel(api);
         this.tabbedPane.addTab("ID Analysis", idAnalysisPanel.getComponent());
 
-        // Add Payload Generators sub-tab (placeholder for future)
-        JPanel payloadGeneratorsPanel = createPayloadGeneratorsPlaceholder();
-        this.tabbedPane.addTab("Payload Generators", payloadGeneratorsPanel);
+        // Add Payload Generators sub-tab
+        SalesforceIdPayloadGeneratorsPanel payloadGeneratorsPanel =
+            new SalesforceIdPayloadGeneratorsPanel(api, generatorManager);
+        this.tabbedPane.addTab("Payload Generators", payloadGeneratorsPanel.getComponent());
 
         this.mainPanel.add(tabbedPane, BorderLayout.CENTER);
-    }
-
-    /**
-     * Create placeholder panel for Payload Generators (future implementation)
-     */
-    private JPanel createPayloadGeneratorsPlaceholder() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
-        JLabel placeholderLabel = new JLabel("Payload Generators - Coming Soon");
-        placeholderLabel.setFont(new Font(placeholderLabel.getFont().getName(), Font.BOLD, 16));
-        placeholderLabel.setForeground(Color.GRAY);
-
-        panel.add(placeholderLabel);
-        return panel;
     }
 
     /**

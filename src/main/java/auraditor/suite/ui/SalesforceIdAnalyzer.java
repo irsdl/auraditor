@@ -207,4 +207,129 @@ public class SalesforceIdAnalyzer {
     public static String formatNumber(long number) {
         return String.valueOf(number);
     }
+
+    /**
+     * Convert decimal (long) to Base62 string with minimum length padding
+     */
+    public static String decimalToBase62(long value, int minLength) {
+        if (value < 0) {
+            throw new IllegalArgumentException("Only non-negative values are supported");
+        }
+
+        if (value == 0) {
+            String zeros = "0";
+            while (zeros.length() < minLength) {
+                zeros += "0";
+            }
+            return zeros;
+        }
+
+        StringBuilder result = new StringBuilder();
+        long n = value;
+        while (n > 0) {
+            int remainder = (int) (n % BASE62);
+            result.insert(0, BASE62_ALPHABET.charAt(remainder));
+            n = n / BASE62;
+        }
+
+        // Pad with zeros to minimum length
+        while (result.length() < minLength) {
+            result.insert(0, '0');
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * Validate if a string is a valid Salesforce ID prefix (first 15 chars must be valid)
+     * Checksum can be invalid - we only check the base 15 characters
+     */
+    public static boolean isValidSalesforceIdPrefix(String id) {
+        if (id == null || id.length() < 15) {
+            return false;
+        }
+
+        String id15 = id.substring(0, 15);
+        return id15.matches("[A-Za-z0-9]{15}");
+    }
+
+    /**
+     * Normalize a Salesforce ID to 15 characters (strip checksum if present)
+     */
+    public static String normalize15(String id) {
+        if (id == null) {
+            throw new IllegalArgumentException("ID cannot be null");
+        }
+
+        String trimmed = id.trim();
+        if (trimmed.length() == 18) {
+            return trimmed.substring(0, 15);
+        } else if (trimmed.length() == 15) {
+            return trimmed;
+        } else {
+            throw new IllegalArgumentException("ID must be 15 or 18 characters");
+        }
+    }
+
+    /**
+     * Convert a 15-char ID to 18-char by adding checksum
+     */
+    public static String computeId18(String id15) {
+        if (id15.length() != 15) {
+            throw new IllegalArgumentException("ID must be exactly 15 characters");
+        }
+        return id15 + computeChecksum(id15);
+    }
+
+    /**
+     * Generate a sequence of Salesforce IDs starting from a base ID
+     *
+     * @param baseId Base Salesforce ID (15 or 18 chars)
+     * @param count Number of IDs to generate
+     * @param upward Direction: true=increment, false=decrement
+     * @param use18Char Output format: true=18-char, false=15-char
+     * @return List of generated Salesforce IDs
+     */
+    public static java.util.List<String> generateSequence(String baseId, int count,
+                                                          boolean upward, boolean use18Char) {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+
+        if (count <= 0) {
+            return ids;
+        }
+
+        // Normalize to 15 chars
+        String id15 = normalize15(baseId);
+
+        // Extract prefix7 and record number
+        String prefix7 = id15.substring(0, 7);
+        String counter8 = id15.substring(7, 15);
+        long startValue = base62ToDecimal(counter8);
+
+        // Generate sequence
+        int step = upward ? 1 : -1;
+        long current = startValue;
+        long maxValue = (long) Math.pow(BASE62, 8) - 1; // Max 8-char base62 value
+
+        for (int i = 0; i < count; i++) {
+            // Check bounds
+            if (current < 0 || current > maxValue) {
+                break;
+            }
+
+            // Generate ID
+            String base62 = decimalToBase62(current, 8);
+            String newId15 = prefix7 + base62;
+
+            if (use18Char) {
+                ids.add(computeId18(newId15));
+            } else {
+                ids.add(newId15);
+            }
+
+            current += step;
+        }
+
+        return ids;
+    }
 }
