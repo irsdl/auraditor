@@ -33,6 +33,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
     private final JList<SalesforceIdGenerator> generatorList;
 
     // Right panel - configuration form
+    private final JPanel configPanel;
     private final JTextField nameField;
     private final JRadioButton useBaseIdRadio;
     private final JRadioButton useIntruderRadio;
@@ -68,6 +69,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
         this.saveButton = new JButton("Save");
         this.statusLabel = new JLabel(" ");
 
+        // Create config panel
+        this.configPanel = createConfigPanel();
+
         // Create main panel
         this.mainPanel = new JPanel(new BorderLayout(10, 10));
         this.mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
@@ -102,8 +106,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
         // Split pane for list and configuration
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setLeftComponent(createListPanel());
-        splitPane.setRightComponent(createConfigPanel());
+        splitPane.setRightComponent(configPanel);
         splitPane.setDividerLocation(200);
+
+        // Initially hide config panel
+        configPanel.setVisible(false);
 
         mainPanel.add(splitPane, BorderLayout.CENTER);
     }
@@ -335,6 +342,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         updatingUI = true;
 
+        // Show config panel when generator is selected
+        configPanel.setVisible(true);
+
         SalesforceIdGenerator gen = manager.getGenerator(selectedIndex);
         if (gen != null) {
             nameField.setText(gen.getName());
@@ -356,6 +366,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
     private void clearForm() {
         updatingUI = true;
+
+        // Hide config panel when nothing is selected
+        configPanel.setVisible(false);
 
         nameField.setText("");
         baseIdField.setText("");
