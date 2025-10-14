@@ -100,7 +100,11 @@ public class AuraditorSuiteTab {
         this.baseRequestsTab.setOnRequestsChangedCallback(() -> {
             actionsTab.refreshRequests();
         });
-        
+
+        // Create and add Salesforce Id Lab tab
+        SalesforceIdLabTab salesforceIdLabTab = new SalesforceIdLabTab(api);
+        this.tabbedPane.addTab("Salesforce Id Lab", salesforceIdLabTab.getComponent());
+
         // Add placeholder tab for future functionality
         JPanel placeholderTab = new JPanel(new BorderLayout());
         placeholderTab.add(new JLabel("Results will be displayed here", SwingConstants.CENTER));
