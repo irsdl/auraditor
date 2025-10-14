@@ -29,7 +29,7 @@ public class AboutTab {
     private static final String AUTHOR_URL = "https://x.com/irsdl";
     private static final String GITHUB_URL = "https://github.com/irsdl/auraditor";
     private static final String ISSUES_URL = "https://github.com/irsdl/auraditor/issues";
-    private static final String DESCRIPTION = "Professional Burp Suite extension for Lightning/Aura framework security testing";
+    private static final String DESCRIPTION = "Burp Suite extension for Lightning/Aura framework security testing";
 
     public AboutTab(MontoyaApi api) {
         this.api = api;
