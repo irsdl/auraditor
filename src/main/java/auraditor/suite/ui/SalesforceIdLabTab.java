@@ -215,7 +215,7 @@ class SalesforceIdAnalysisPanel {
             } else {
                 output.append("✗ Checksum is INVALID\n");
                 output.append("   Expected checksum: ").append(result.expectedChecksum).append("\n");
-                output.append("   Actual checksum:   ").append(result.checksum).append("\n");
+                output.append("   Provided checksum: ").append(result.checksum).append("\n");
             }
             output.append("\n");
             output.append("Base 15-character ID:\n");
