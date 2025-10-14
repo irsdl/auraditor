@@ -69,8 +69,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
         this.saveButton = new JButton("Save");
         this.statusLabel = new JLabel(" ");
 
-        // Create config panel
+        // Create config panel (initially invisible)
         this.configPanel = createConfigPanel();
+        this.configPanel.setVisible(false);
 
         // Create main panel
         this.mainPanel = new JPanel(new BorderLayout(10, 10));
@@ -78,6 +79,10 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         createUI();
         loadGenerators();
+
+        // Ensure no selection and panel hidden on initial load
+        generatorList.clearSelection();
+        selectedIndex = -1;
     }
 
     private void createUI() {
@@ -109,9 +114,6 @@ public class SalesforceIdPayloadGeneratorsPanel {
         splitPane.setRightComponent(configPanel);
         splitPane.setDividerLocation(200);
 
-        // Initially hide config panel
-        configPanel.setVisible(false);
-
         mainPanel.add(splitPane, BorderLayout.CENTER);
     }
 
@@ -139,9 +141,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         JPanel formPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.anchor = GridBagConstraints.WEST;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
         gbc.insets = new Insets(5, 5, 5, 5);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.weightx = 0.0;
+        gbc.weighty = 0.0;
 
         int row = 0;
 
@@ -240,8 +244,18 @@ public class SalesforceIdPayloadGeneratorsPanel {
         gbc.gridwidth = 2;
         statusLabel.setForeground(Color.RED);
         formPanel.add(statusLabel, gbc);
+        row++;
 
-        panel.add(formPanel, BorderLayout.NORTH);
+        // Add glue to push everything to top-left
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        formPanel.add(Box.createGlue(), gbc);
+
+        panel.add(formPanel, BorderLayout.CENTER);
 
         // Add listeners for auto-save and validation
         setupFormListeners();
