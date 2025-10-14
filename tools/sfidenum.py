@@ -2,6 +2,8 @@
 """
 Salesforce ID Tool
 
+Author: AI instructed by Soroush Dalili (@irsdl) - 2025
+
 Features:
 - Decode the base62 record number embedded in a 15/18-char Salesforce ID.
 - Enumerate IDs from a starting integer value OR from the current ID's value.

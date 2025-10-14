@@ -4,9 +4,9 @@
 
 # Auraditor
 
-A Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
+A professional Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
 
-This is an **independent enhanced version** based on the original [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) project (now archived). Auraditor includes significant modernizations, new features, and improved usability for security testing professionals.
+Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))** for modern security testing professionals.
 
 ## ⚠️ **DISCLAIMER**
 
@@ -103,24 +103,11 @@ In Burp Suite:
     - Method reference patterns (cross-module usage)
     - Ternary selection patterns (shared parameter objects)
 
-## Contributors & Acknowledgments
+## Contributors
 
 **Auraditor (Professional Security Testing Tool):**
 - **Soroush Dalili** ([@irsdl](https://github.com/irsdl)) - Project maintainer, enhanced features, modernization, and improvements
 - **AI Collaboration** - Technical implementation, API migration, and code optimization!
-
-**Original Foundation:**
-- **Salesforce.com, Inc.** - Original Lightning Burp extension development ([archived project](https://github.com/salesforce/lightning-burp))
-
-Auraditor represents a significant evolution from the original codebase, with extensive modernization, new features, and improved user experience. While built upon the foundation of the original Salesforce project, this is an independent project with its own development direction and maintenance.
-
-### Acknowledgments & Inspiration
-Special thanks to the following projects for inspiration and advancing Salesforce security testing:
-
-- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
-- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
-
-These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
 
 
 
@@ -141,7 +128,7 @@ JAR files include the full version: `auraditor-2.0.1.jar`
 
 ## Project Status
 
-**Independent Enhanced Project** - This is a standalone project that evolved from the original Salesforce Lightning Burp extension. Key differences:
+**Independent Enhanced Project** - Active development with modern features:
 
 - ✅ **Active Development**: Maintained and enhanced with new features
 - ✅ **Modern API**: Updated to Burp Suite Montoya API (2025.8)
@@ -149,12 +136,21 @@ JAR files include the full version: `auraditor-2.0.1.jar`
 - ✅ **Independent**: Not affiliated with or supported by Salesforce
 - ⚠️ **No Official Support**: Community-driven development, use at your own risk
 
-The original [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) repository is archived and no longer maintained.
-
 ## Additional Resources & Inspiration
 
 ### Recommended Reading
 - [**Salesforce Penetration Testing Fundamentals**](https://projectblack.io/blog/salesforce-penetration-testing-fundamentals/) - Comprehensive guide to Salesforce security testing methodologies
 - [**Exposing Broken Access Controls in Salesforce-based Applications**](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/) - In-depth analysis of access control vulnerabilities in Salesforce applications
 - [**Misconfigured Salesforce Experiences**](https://www.varonis.com/blog/misconfigured-salesforce-experiences) - Common misconfigurations and security issues in Salesforce implementations
+
+### Acknowledgments
+Special thanks to the following projects for inspiration and advancing Salesforce security testing:
+
+- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
+- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
+
+These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
+
+### Original Foundation
+This project builds upon the foundation of the original [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) project (now archived). Auraditor represents a significant evolution with extensive modernization, new features, and improved user experience as an independent project with its own development direction.
 
