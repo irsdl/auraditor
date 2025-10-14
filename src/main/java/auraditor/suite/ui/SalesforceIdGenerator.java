@@ -168,9 +168,39 @@ public class SalesforceIdGenerator {
             if (!SalesforceIdAnalyzer.isValidSalesforceIdPrefix(baseId.trim())) {
                 return "Base ID must be a valid 15 or 18 character Salesforce ID";
             }
+
+            // Validate that the record number doesn't exceed max bounds
+            try {
+                String id15 = SalesforceIdAnalyzer.normalize15(baseId.trim());
+                String counter8 = id15.substring(7, 15);
+                long recordValue = base62ToDecimal(counter8);
+
+                if (recordValue < 0 || recordValue > SalesforceIdAnalyzer.MAX_BASE62_8) {
+                    return "Base ID record number is out of bounds (0 to " +
+                           SalesforceIdAnalyzer.MAX_BASE62_8 + ")";
+                }
+            } catch (Exception e) {
+                return "Invalid Base ID format: " + e.getMessage();
+            }
         }
 
         return null; // Valid
+    }
+
+    /**
+     * Convert Base62 string to decimal (for validation)
+     */
+    private long base62ToDecimal(String base62) {
+        String alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        long result = 0;
+        for (char c : base62.toCharArray()) {
+            int index = alphabet.indexOf(c);
+            if (index == -1) {
+                throw new IllegalArgumentException("Invalid Base62 character: " + c);
+            }
+            result = result * 62 + index;
+        }
+        return result;
     }
 
     /**

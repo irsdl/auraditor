@@ -391,8 +391,8 @@ public class SalesforceIdPayloadGeneratorsPanel {
             listModel.addElement(newGen);
             generatorList.setSelectedIndex(listModel.getSize() - 1);
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(mainPanel, "Error creating generator: " + e.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            api.logging().logToError("Error creating generator: " + e.getMessage());
+            statusLabel.setText("Error: " + e.getMessage());
         }
     }
 
@@ -401,9 +401,12 @@ public class SalesforceIdPayloadGeneratorsPanel {
             return;
         }
 
-        int result = JOptionPane.showConfirmDialog(mainPanel,
+        // Use Swing's built-in confirmation dialog with proper parent
+        int result = JOptionPane.showConfirmDialog(
+                SwingUtilities.getWindowAncestor(mainPanel),
                 "Delete generator '" + manager.getGenerator(selectedIndex).getName() + "'?",
-                "Confirm Delete", JOptionPane.YES_NO_OPTION);
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION);
 
         if (result == JOptionPane.YES_OPTION) {
             try {
@@ -411,8 +414,8 @@ public class SalesforceIdPayloadGeneratorsPanel {
                 listModel.remove(selectedIndex);
                 clearForm();
             } catch (Exception e) {
-                JOptionPane.showMessageDialog(mainPanel, "Error deleting generator: " + e.getMessage(),
-                        "Error", JOptionPane.ERROR_MESSAGE);
+                api.logging().logToError("Error deleting generator: " + e.getMessage());
+                statusLabel.setText("Error: " + e.getMessage());
             }
         }
     }
@@ -426,7 +429,8 @@ public class SalesforceIdPayloadGeneratorsPanel {
         String error = gen.validate();
 
         if (error != null) {
-            JOptionPane.showMessageDialog(mainPanel, error, "Validation Error", JOptionPane.ERROR_MESSAGE);
+            api.logging().logToError("Validation error: " + error);
+            statusLabel.setText(error);
             return;
         }
 
@@ -436,32 +440,31 @@ public class SalesforceIdPayloadGeneratorsPanel {
             saveButton.setVisible(false);
             statusLabel.setText(" ");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(mainPanel, "Error saving: " + e.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            api.logging().logToError("Error saving generator: " + e.getMessage());
+            statusLabel.setText("Error: " + e.getMessage());
         }
     }
 
     private void exportToFile() {
         if (selectedIndex < 0) {
-            JOptionPane.showMessageDialog(mainPanel, "Please select a generator first",
-                    "No Selection", JOptionPane.WARNING_MESSAGE);
+            api.logging().logToOutput("Export: No generator selected");
+            statusLabel.setText("Please select a generator first");
             return;
         }
 
         SalesforceIdGenerator gen = manager.getGenerator(selectedIndex);
         if (!gen.canExportToFile()) {
-            JOptionPane.showMessageDialog(mainPanel,
-                    "Can only export generators with a Base ID (not using Intruder Payload)",
-                    "Cannot Export", JOptionPane.WARNING_MESSAGE);
+            api.logging().logToOutput("Export: Generator requires Base ID");
+            statusLabel.setText("Can only export generators with a Base ID");
             return;
         }
 
-        // Show file chooser
+        // Show file chooser with proper parent
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Export Salesforce IDs to File");
         fileChooser.setSelectedFile(new File("salesforce-ids-" + gen.getName() + ".txt"));
 
-        int result = fileChooser.showSaveDialog(mainPanel);
+        int result = fileChooser.showSaveDialog(SwingUtilities.getWindowAncestor(mainPanel));
         if (result != JFileChooser.APPROVE_OPTION) {
             return;
         }
@@ -492,13 +495,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
             protected void done() {
                 try {
                     get();
-                    JOptionPane.showMessageDialog(mainPanel,
-                            "Exported " + gen.getCount() + " IDs to:\n" + file.getAbsolutePath(),
-                            "Export Successful", JOptionPane.INFORMATION_MESSAGE);
+                    api.logging().logToOutput("Exported " + gen.getCount() + " IDs to: " + file.getAbsolutePath());
+                    statusLabel.setText("Exported " + gen.getCount() + " IDs successfully");
                 } catch (Exception e) {
-                    JOptionPane.showMessageDialog(mainPanel,
-                            "Error exporting: " + e.getMessage(),
-                            "Export Failed", JOptionPane.ERROR_MESSAGE);
+                    api.logging().logToError("Error exporting: " + e.getMessage());
+                    statusLabel.setText("Export failed: " + e.getMessage());
                 }
             }
         };

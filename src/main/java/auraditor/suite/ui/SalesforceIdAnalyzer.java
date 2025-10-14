@@ -25,6 +25,9 @@ public class SalesforceIdAnalyzer {
     private static final String BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static final int BASE62 = BASE62_ALPHABET.length();
 
+    // Maximum value representable by 8 base62 chars: 62^8 - 1 = 218,340,105,584,895
+    public static final long MAX_BASE62_8 = 218340105584895L;
+
     // Checksum mapping alphabet (A-Z, 0-5) - 32 characters for 5-bit values
     private static final String CHECKSUM_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345";
 
@@ -309,11 +312,10 @@ public class SalesforceIdAnalyzer {
         // Generate sequence
         int step = upward ? 1 : -1;
         long current = startValue;
-        long maxValue = (long) Math.pow(BASE62, 8) - 1; // Max 8-char base62 value
 
         for (int i = 0; i < count; i++) {
-            // Check bounds
-            if (current < 0 || current > maxValue) {
+            // Check bounds (same as sfidenum.py)
+            if (current < 0 || current > MAX_BASE62_8) {
                 break;
             }
 
