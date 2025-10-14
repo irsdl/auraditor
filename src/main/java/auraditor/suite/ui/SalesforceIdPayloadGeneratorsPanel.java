@@ -79,15 +79,21 @@ public class SalesforceIdPayloadGeneratorsPanel {
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         JButton newButton = new JButton("New Generator");
         JButton deleteButton = new JButton("Delete");
-        JButton exportButton = new JButton("Export to File");
+        JButton outputButton = new JButton("Output to File");
+        JButton exportConfigsButton = new JButton("Export Configs");
+        JButton importConfigsButton = new JButton("Import Configs");
 
         newButton.addActionListener(e -> createNewGenerator());
         deleteButton.addActionListener(e -> deleteSelectedGenerator());
-        exportButton.addActionListener(e -> exportToFile());
+        outputButton.addActionListener(e -> outputToFile());
+        exportConfigsButton.addActionListener(e -> exportConfigs());
+        importConfigsButton.addActionListener(e -> importConfigs());
 
         toolbarPanel.add(newButton);
         toolbarPanel.add(deleteButton);
-        toolbarPanel.add(exportButton);
+        toolbarPanel.add(outputButton);
+        toolbarPanel.add(exportConfigsButton);
+        toolbarPanel.add(importConfigsButton);
 
         mainPanel.add(toolbarPanel, BorderLayout.NORTH);
 
@@ -445,23 +451,23 @@ public class SalesforceIdPayloadGeneratorsPanel {
         }
     }
 
-    private void exportToFile() {
+    private void outputToFile() {
         if (selectedIndex < 0) {
-            api.logging().logToOutput("Export: No generator selected");
+            api.logging().logToOutput("Output: No generator selected");
             statusLabel.setText("Please select a generator first");
             return;
         }
 
         SalesforceIdGenerator gen = manager.getGenerator(selectedIndex);
         if (!gen.canExportToFile()) {
-            api.logging().logToOutput("Export: Generator requires Base ID");
-            statusLabel.setText("Can only export generators with a Base ID");
+            api.logging().logToOutput("Output: Generator requires Base ID");
+            statusLabel.setText("Can only output generators with a Base ID");
             return;
         }
 
         // Show file chooser with proper parent
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Export Salesforce IDs to File");
+        fileChooser.setDialogTitle("Output Salesforce IDs to File");
         fileChooser.setSelectedFile(new File("salesforce-ids-" + gen.getName() + ".txt"));
 
         int result = fileChooser.showSaveDialog(SwingUtilities.getWindowAncestor(mainPanel));
@@ -471,7 +477,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         File file = fileChooser.getSelectedFile();
 
-        // Generate and export in background
+        // Generate and output in background
         SwingWorker<Void, Integer> worker = new SwingWorker<Void, Integer>() {
             @Override
             protected Void doInBackground() throws Exception {
@@ -495,16 +501,62 @@ public class SalesforceIdPayloadGeneratorsPanel {
             protected void done() {
                 try {
                     get();
-                    api.logging().logToOutput("Exported " + gen.getCount() + " IDs to: " + file.getAbsolutePath());
-                    statusLabel.setText("Exported " + gen.getCount() + " IDs successfully");
+                    api.logging().logToOutput("Output " + gen.getCount() + " IDs to: " + file.getAbsolutePath());
+                    statusLabel.setText("Output " + gen.getCount() + " IDs successfully");
                 } catch (Exception e) {
-                    api.logging().logToError("Error exporting: " + e.getMessage());
-                    statusLabel.setText("Export failed: " + e.getMessage());
+                    api.logging().logToError("Error outputting: " + e.getMessage());
+                    statusLabel.setText("Output failed: " + e.getMessage());
                 }
             }
         };
 
         worker.execute();
+    }
+
+    private void exportConfigs() {
+        // Show file chooser with proper parent
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Export Generator Configurations");
+        fileChooser.setSelectedFile(new File("salesforce-id-generators.json"));
+
+        int result = fileChooser.showSaveDialog(SwingUtilities.getWindowAncestor(mainPanel));
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File file = fileChooser.getSelectedFile();
+
+        try {
+            manager.exportToFile(file);
+            api.logging().logToOutput("Exported configurations to: " + file.getAbsolutePath());
+            statusLabel.setText("Configurations exported successfully");
+        } catch (Exception e) {
+            api.logging().logToError("Error exporting configurations: " + e.getMessage());
+            statusLabel.setText("Export failed: " + e.getMessage());
+        }
+    }
+
+    private void importConfigs() {
+        // Show file chooser with proper parent
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Import Generator Configurations");
+
+        int result = fileChooser.showOpenDialog(SwingUtilities.getWindowAncestor(mainPanel));
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        File file = fileChooser.getSelectedFile();
+
+        try {
+            manager.importFromFile(file);
+            loadGenerators();
+            api.logging().logToOutput("Imported configurations from: " + file.getAbsolutePath());
+            statusLabel.setText("Configurations imported successfully");
+        } catch (Exception e) {
+            api.logging().logToError("Error importing configurations: " + e.getMessage());
+            statusLabel.setText("Import failed: " + e.getMessage());
+        }
     }
 
     public JComponent getComponent() {

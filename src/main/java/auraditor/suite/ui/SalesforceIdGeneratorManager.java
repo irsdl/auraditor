@@ -7,7 +7,12 @@
 package auraditor.suite.ui;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.persistence.PersistedObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,14 +29,21 @@ import java.util.Map;
  */
 public class SalesforceIdGeneratorManager {
 
+    private static final String PERSISTENCE_KEY = "salesforce_id_generators";
     private final MontoyaApi api;
     private final List<SalesforceIdGenerator> generators;
     private final Map<String, SalesforceIdGeneratorProvider> registeredProviders;
+    private final ObjectMapper objectMapper;
 
     public SalesforceIdGeneratorManager(MontoyaApi api) {
         this.api = api;
         this.generators = new ArrayList<>();
         this.registeredProviders = new HashMap<>();
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        // Load saved generators from project file
+        loadFromPersistence();
     }
 
     /**
@@ -56,6 +68,7 @@ public class SalesforceIdGeneratorManager {
 
         generators.add(generator);
         registerWithBurp(generator);
+        saveToPersistence();
 
         api.logging().logToOutput("Added Salesforce ID generator: " + generator.getName());
     }
@@ -84,6 +97,7 @@ public class SalesforceIdGeneratorManager {
         // Update and register new
         generators.set(index, generator);
         registerWithBurp(generator);
+        saveToPersistence();
 
         api.logging().logToOutput("Updated Salesforce ID generator: " + generator.getName());
     }
@@ -99,6 +113,7 @@ public class SalesforceIdGeneratorManager {
         SalesforceIdGenerator generator = generators.get(index);
         unregisterFromBurp(generator);
         generators.remove(index);
+        saveToPersistence();
 
         api.logging().logToOutput("Deleted Salesforce ID generator: " + generator.getName());
     }
@@ -160,8 +175,129 @@ public class SalesforceIdGeneratorManager {
      * Cleanup all generators (called on extension unload)
      */
     public void cleanup() {
+        // Save to persistence before cleanup
+        saveToPersistence();
+
         api.logging().logToOutput("Cleaning up " + generators.size() + " Salesforce ID generators");
         generators.clear();
         registeredProviders.clear();
+    }
+
+    /**
+     * Export all generator configurations to a JSON file
+     */
+    public void exportToFile(File file) throws IOException {
+        List<GeneratorConfig> configs = new ArrayList<>();
+        for (SalesforceIdGenerator gen : generators) {
+            configs.add(new GeneratorConfig(gen));
+        }
+        objectMapper.writeValue(file, configs);
+    }
+
+    /**
+     * Import generator configurations from a JSON file
+     */
+    public void importFromFile(File file) throws IOException {
+        GeneratorConfig[] configs = objectMapper.readValue(file, GeneratorConfig[].class);
+
+        // Clear existing generators
+        for (SalesforceIdGenerator gen : new ArrayList<>(generators)) {
+            unregisterFromBurp(gen);
+        }
+        generators.clear();
+
+        // Add imported generators
+        for (GeneratorConfig config : configs) {
+            SalesforceIdGenerator gen = config.toGenerator();
+            generators.add(gen);
+            registerWithBurp(gen);
+        }
+
+        // Save to persistence
+        saveToPersistence();
+
+        api.logging().logToOutput("Imported " + configs.length + " generator(s) from file");
+    }
+
+    /**
+     * Save all generators to Burp project persistence
+     */
+    private void saveToPersistence() {
+        try {
+            PersistedObject persistedObject = api.persistence().extensionData();
+
+            List<GeneratorConfig> configs = new ArrayList<>();
+            for (SalesforceIdGenerator gen : generators) {
+                configs.add(new GeneratorConfig(gen));
+            }
+
+            String json = objectMapper.writeValueAsString(configs);
+            persistedObject.setString(PERSISTENCE_KEY, json);
+
+            api.logging().logToOutput("Saved " + generators.size() + " generator(s) to project file");
+        } catch (Exception e) {
+            api.logging().logToError("Failed to save generators to persistence: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load generators from Burp project persistence
+     */
+    private void loadFromPersistence() {
+        try {
+            PersistedObject persistedObject = api.persistence().extensionData();
+            String json = persistedObject.getString(PERSISTENCE_KEY);
+
+            if (json != null && !json.isEmpty()) {
+                GeneratorConfig[] configs = objectMapper.readValue(json, GeneratorConfig[].class);
+
+                for (GeneratorConfig config : configs) {
+                    SalesforceIdGenerator gen = config.toGenerator();
+                    generators.add(gen);
+                    registerWithBurp(gen);
+                }
+
+                api.logging().logToOutput("Loaded " + generators.size() + " generator(s) from project file");
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Failed to load generators from persistence: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Internal class for JSON serialization/deserialization
+     */
+    private static class GeneratorConfig {
+        public String name;
+        public String baseId;
+        public boolean useIntruderPayload;
+        public int count;
+        public boolean upward;
+        public boolean generate18Char;
+
+        // Default constructor for Jackson
+        public GeneratorConfig() {
+        }
+
+        // Constructor from SalesforceIdGenerator
+        public GeneratorConfig(SalesforceIdGenerator gen) {
+            this.name = gen.getName();
+            this.baseId = gen.getBaseId();
+            this.useIntruderPayload = gen.isUseIntruderPayload();
+            this.count = gen.getCount();
+            this.upward = gen.isUpward();
+            this.generate18Char = gen.isGenerate18Char();
+        }
+
+        // Convert to SalesforceIdGenerator
+        public SalesforceIdGenerator toGenerator() {
+            SalesforceIdGenerator gen = new SalesforceIdGenerator(name);
+            gen.setBaseId(baseId);
+            gen.setUseIntruderPayload(useIntruderPayload);
+            gen.setCount(count);
+            gen.setUpward(upward);
+            gen.setGenerate18Char(generate18Char);
+            return gen;
+        }
     }
 }
