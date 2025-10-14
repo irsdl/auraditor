@@ -105,7 +105,11 @@ public class AuraditorSuiteTab {
         JPanel placeholderTab = new JPanel(new BorderLayout());
         placeholderTab.add(new JLabel("Results will be displayed here", SwingConstants.CENTER));
         this.tabbedPane.addTab("Results", resultsTabbedPane);
-        
+
+        // Create and add About tab
+        AboutTab aboutTab = new AboutTab(api);
+        this.tabbedPane.addTab("About", aboutTab.getComponent());
+
         // Add tab change listener to handle empty actions tab
         this.tabbedPane.addChangeListener(e -> {
             int selectedIndex = tabbedPane.getSelectedIndex();
