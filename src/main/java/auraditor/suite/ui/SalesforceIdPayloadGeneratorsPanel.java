@@ -34,6 +34,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
     // Right panel - configuration form
     private final JPanel configPanel;
+    private JSplitPane splitPane;
     private final JTextField nameField;
     private final JRadioButton useBaseIdRadio;
     private final JRadioButton useIntruderRadio;
@@ -109,10 +110,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
         mainPanel.add(toolbarPanel, BorderLayout.NORTH);
 
         // Split pane for list and configuration
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        this.splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         splitPane.setLeftComponent(createListPanel());
         splitPane.setRightComponent(configPanel);
         splitPane.setDividerLocation(200);
+        splitPane.setResizeWeight(0.0); // Keep left panel fixed size
 
         mainPanel.add(splitPane, BorderLayout.CENTER);
     }
@@ -358,6 +360,8 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         // Show config panel when generator is selected
         configPanel.setVisible(true);
+        // Reset divider position when showing panel
+        SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(200));
 
         SalesforceIdGenerator gen = manager.getGenerator(selectedIndex);
         if (gen != null) {
