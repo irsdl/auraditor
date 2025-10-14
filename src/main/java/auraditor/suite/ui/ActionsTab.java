@@ -744,19 +744,25 @@ public class ActionsTab {
         // Add some spacing at the bottom
         gbc.gridy++; gbc.weighty = 1.0;
         actionsPanel.add(Box.createVerticalGlue(), gbc);
-        
+
         // Wrap in a panel with padding and left-align everything
         JPanel paddedPanel = new JPanel(new BorderLayout());
         paddedPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        
+
         // Create a left-aligned wrapper
         JPanel leftAlignedWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         leftAlignedWrapper.add(actionsPanel);
         paddedPanel.add(leftAlignedWrapper, BorderLayout.WEST);
-        
+
+        // Wrap paddedPanel in a JScrollPane for vertical scrolling
+        JScrollPane scrollPane = new JScrollPane(paddedPanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.setBorder(null); // Remove default scroll pane border
+
         // Add to main panel
         mainPanel.add(topPanel, BorderLayout.NORTH);
-        mainPanel.add(paddedPanel, BorderLayout.CENTER);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
         mainPanel.add(statusPanel, BorderLayout.SOUTH);
         
         // Initially disable wordlist file selection
