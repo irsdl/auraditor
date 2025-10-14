@@ -16,6 +16,12 @@ Output rules:
 - enum modes:
     - when --displayonly: print ONLY Salesforce IDs (15 or 18 chars), one per line.
     - otherwise: write ONLY Salesforce IDs to the file (one per line), NO console output.
+
+References:
+- https://codebycody.com/salesforce-ids-explained/
+- https://codebycody.com/salesforces-algorithm-for-converting-ids-from-15-to-18-characters/
+- https://help.salesforce.com/s/articleView?id=000385203&type=1
+- https://www.fishofprey.com/2011/09/obscure-salesforce-object-key-prefixes.html
 """
 
 import argparse
