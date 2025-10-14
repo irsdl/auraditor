@@ -47,6 +47,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
     private boolean updatingUI = false;
     private int selectedIndex = -1;
     private SwingWorker<Void, Integer> currentOutputWorker = null;
+    private File lastUsedDirectory = null;
 
     public SalesforceIdPayloadGeneratorsPanel(MontoyaApi api, SalesforceIdGeneratorManager manager) {
         this.api = api;
@@ -468,8 +469,14 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         // Show file chooser with proper parent
         JFileChooser fileChooser = new JFileChooser();
+        if (lastUsedDirectory != null) {
+            fileChooser.setCurrentDirectory(lastUsedDirectory);
+        }
         fileChooser.setDialogTitle("Output Salesforce IDs to File");
-        fileChooser.setSelectedFile(new File("salesforce-ids-" + gen.getName() + ".txt"));
+        fileChooser.setSelectedFile(new File(
+            lastUsedDirectory != null ? lastUsedDirectory : new File("."),
+            "salesforce-ids-" + gen.getName() + ".txt"
+        ));
 
         int result = fileChooser.showSaveDialog(SwingUtilities.getWindowAncestor(mainPanel));
         if (result != JFileChooser.APPROVE_OPTION) {
@@ -477,6 +484,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
         }
 
         File file = fileChooser.getSelectedFile();
+        lastUsedDirectory = file.getParentFile();
 
         // Create cancel button
         JButton cancelButton = new JButton("Cancel Output");
@@ -631,8 +639,14 @@ public class SalesforceIdPayloadGeneratorsPanel {
     private void exportConfigs() {
         // Show file chooser with proper parent
         JFileChooser fileChooser = new JFileChooser();
+        if (lastUsedDirectory != null) {
+            fileChooser.setCurrentDirectory(lastUsedDirectory);
+        }
         fileChooser.setDialogTitle("Export Generator Configurations");
-        fileChooser.setSelectedFile(new File("salesforce-id-generators.json"));
+        fileChooser.setSelectedFile(new File(
+            lastUsedDirectory != null ? lastUsedDirectory : new File("."),
+            "salesforce-id-generators.json"
+        ));
 
         int result = fileChooser.showSaveDialog(SwingUtilities.getWindowAncestor(mainPanel));
         if (result != JFileChooser.APPROVE_OPTION) {
@@ -640,6 +654,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
         }
 
         File file = fileChooser.getSelectedFile();
+        lastUsedDirectory = file.getParentFile();
 
         try {
             manager.exportToFile(file);
@@ -654,6 +669,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
     private void importConfigs() {
         // Show file chooser with proper parent
         JFileChooser fileChooser = new JFileChooser();
+        if (lastUsedDirectory != null) {
+            fileChooser.setCurrentDirectory(lastUsedDirectory);
+        }
         fileChooser.setDialogTitle("Import Generator Configurations");
 
         int result = fileChooser.showOpenDialog(SwingUtilities.getWindowAncestor(mainPanel));
@@ -662,6 +680,7 @@ public class SalesforceIdPayloadGeneratorsPanel {
         }
 
         File file = fileChooser.getSelectedFile();
+        lastUsedDirectory = file.getParentFile();
 
         try {
             manager.importFromFile(file);
