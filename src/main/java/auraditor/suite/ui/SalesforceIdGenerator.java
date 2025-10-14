@@ -155,9 +155,8 @@ public class SalesforceIdGenerator {
             return "Count must be positive";
         }
 
-        if (count > 1000000) {
-            return "Count cannot exceed 1,000,000";
-        }
+        // No upper limit on count - limited only by memory and time
+        // User can generate as many IDs as needed (e.g., 2,000,000+)
 
         // If using base ID, validate it
         if (!useIntruderPayload && (baseId == null || baseId.trim().isEmpty())) {

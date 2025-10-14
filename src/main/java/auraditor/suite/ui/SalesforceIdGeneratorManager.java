@@ -7,6 +7,7 @@
 package auraditor.suite.ui;
 
 import burp.api.montoya.MontoyaApi;
+import burp.api.montoya.core.Registration;
 import burp.api.montoya.persistence.PersistedObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -32,13 +33,13 @@ public class SalesforceIdGeneratorManager {
     private static final String PERSISTENCE_KEY = "salesforce_id_generators";
     private final MontoyaApi api;
     private final List<SalesforceIdGenerator> generators;
-    private final Map<String, SalesforceIdGeneratorProvider> registeredProviders;
+    private final Map<String, Registration> registrations;
     private final ObjectMapper objectMapper;
 
     public SalesforceIdGeneratorManager(MontoyaApi api) {
         this.api = api;
         this.generators = new ArrayList<>();
-        this.registeredProviders = new HashMap<>();
+        this.registrations = new HashMap<>();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
 
@@ -158,17 +159,18 @@ public class SalesforceIdGeneratorManager {
      */
     private void registerWithBurp(SalesforceIdGenerator generator) {
         SalesforceIdGeneratorProvider provider = new SalesforceIdGeneratorProvider(generator);
-        api.intruder().registerPayloadGeneratorProvider(provider);
-        registeredProviders.put(generator.getName(), provider);
+        Registration registration = api.intruder().registerPayloadGeneratorProvider(provider);
+        registrations.put(generator.getName(), registration);
     }
 
     /**
      * Unregister a generator from Burp Intruder
      */
     private void unregisterFromBurp(SalesforceIdGenerator generator) {
-        // Note: Burp Montoya API doesn't provide an unregister method
-        // The provider will simply stop being used after this point
-        registeredProviders.remove(generator.getName());
+        Registration registration = registrations.remove(generator.getName());
+        if (registration != null && registration.isRegistered()) {
+            registration.deregister();
+        }
     }
 
     /**
@@ -179,8 +181,16 @@ public class SalesforceIdGeneratorManager {
         saveToPersistence();
 
         api.logging().logToOutput("Cleaning up " + generators.size() + " Salesforce ID generators");
+
+        // Deregister all providers
+        for (Registration registration : registrations.values()) {
+            if (registration.isRegistered()) {
+                registration.deregister();
+            }
+        }
+
         generators.clear();
-        registeredProviders.clear();
+        registrations.clear();
     }
 
     /**
