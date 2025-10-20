@@ -133,7 +133,21 @@ public class AuraditorSuiteTab {
         // Add tabbed pane to main panel - no header needed
         this.mainPanel.add(tabbedPane, BorderLayout.CENTER);
     }
-    
+
+    /**
+     * Switch to a tab by its name in the main tabbed pane
+     * @param tabName The name of the tab to switch to
+     */
+    private void switchToTab(String tabName) {
+        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+            if (tabbedPane.getTitleAt(i).equals(tabName)) {
+                tabbedPane.setSelectedIndex(i);
+                return;
+            }
+        }
+        api.logging().logToError("Could not find tab with name: " + tabName);
+    }
+
     /**
      * Create a new result tab with the given ID and content
      */
@@ -160,7 +174,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
     
@@ -185,7 +199,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
 
@@ -210,7 +224,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
 
@@ -255,7 +269,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
 
@@ -303,7 +317,7 @@ public class AuraditorSuiteTab {
             }
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
     
@@ -400,7 +414,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
 
@@ -450,7 +464,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(3); // Results tab index
+            switchToTab("Results");
         });
     }
 
