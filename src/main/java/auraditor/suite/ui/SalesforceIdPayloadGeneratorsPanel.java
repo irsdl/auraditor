@@ -46,6 +46,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
     private final JButton saveButton;
     private final JLabel statusLabel;
 
+    // Toolbar buttons
+    private JButton deleteButton;
+    private JButton outputButton;
+    private JButton exportConfigsButton;
+
     private boolean updatingUI = false;
     private int selectedIndex = -1;
     private SwingWorker<Void, Integer> currentOutputWorker = null;
@@ -90,9 +95,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
         // Top toolbar
         JPanel toolbarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 5));
         JButton newButton = new JButton("New Generator");
-        JButton deleteButton = new JButton("Delete");
-        JButton outputButton = new JButton("Output to File");
-        JButton exportConfigsButton = new JButton("Export Configs");
+        this.deleteButton = new JButton("Delete");
+        this.outputButton = new JButton("Output to File");
+        this.exportConfigsButton = new JButton("Export Configs");
         JButton importConfigsButton = new JButton("Import Configs");
 
         newButton.addActionListener(e -> createNewGenerator());
@@ -100,6 +105,11 @@ public class SalesforceIdPayloadGeneratorsPanel {
         outputButton.addActionListener(e -> outputToFile());
         exportConfigsButton.addActionListener(e -> exportConfigs());
         importConfigsButton.addActionListener(e -> importConfigs());
+
+        // Initially disable buttons that require a selection
+        deleteButton.setEnabled(false);
+        outputButton.setEnabled(false);
+        exportConfigsButton.setEnabled(false);
 
         toolbarPanel.add(newButton);
         toolbarPanel.add(deleteButton);
@@ -348,6 +358,13 @@ public class SalesforceIdPayloadGeneratorsPanel {
         }
     }
 
+    private void updateButtonStates() {
+        boolean hasSelection = selectedIndex >= 0;
+        deleteButton.setEnabled(hasSelection);
+        outputButton.setEnabled(hasSelection);
+        exportConfigsButton.setEnabled(hasSelection);
+    }
+
     private void loadSelectedGenerator() {
         selectedIndex = generatorList.getSelectedIndex();
 
@@ -362,6 +379,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
         configPanel.setVisible(true);
         // Reset divider position when showing panel
         SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(200));
+
+        // Update button states
+        updateButtonStates();
 
         SalesforceIdGenerator gen = manager.getGenerator(selectedIndex);
         if (gen != null) {
@@ -400,6 +420,9 @@ public class SalesforceIdPayloadGeneratorsPanel {
 
         saveButton.setVisible(false);
         statusLabel.setText(" ");
+
+        // Update button states
+        updateButtonStates();
 
         updatingUI = false;
     }

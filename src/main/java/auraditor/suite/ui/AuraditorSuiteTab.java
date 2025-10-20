@@ -105,7 +105,7 @@ public class AuraditorSuiteTab {
 
         // Create and add Salesforce ID Lab tab
         SalesforceIdLabTab salesforceIdLabTab = new SalesforceIdLabTab(api, generatorManager);
-        this.tabbedPane.addTab("Salesforce ID Lab (BETA)", salesforceIdLabTab.getComponent());
+        this.tabbedPane.addTab("Salesforce ID Lab", salesforceIdLabTab.getComponent());
 
         // Add placeholder tab for future functionality
         JPanel placeholderTab = new JPanel(new BorderLayout());
