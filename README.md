@@ -4,13 +4,13 @@
 
 # Auraditor
 
-A Burp Suite extension for Lightning/Aura framework security testing with advanced action management, context editing, and comprehensive audit capabilities.
+A Burp Suite extension for security testing Salesforce Lightning and Aura framework applications.
 
-Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))** for modern security testing professionals.
+Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))**.
 
 ## ⚠️ **DISCLAIMER**
 
-**This tool is for authorized security testing only.** 
+**This tool is for authorized security testing only.**
 
 - ❌ **NO SUPPORT**: The maintainer provides no support or warranty
 - ❌ **NO LIABILITY**: The maintainer is not responsible for any damage, harm, or legal consequences
@@ -19,32 +19,43 @@ Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))** for modern 
 
 **Use at your own risk. Ensure you have proper authorization before testing any systems.**
 
-Installs Aura tabs on HTTP message editors (Interceptor, Repeater, etc). Decodes and prettifies the aura actions, and makes params editable with intelligent error handling, action management, and user control over invalid JSON scenarios.
-
 ## Features
 
-### Current Capabilities
-- **Aura Actions Tab** - Individual action editing with Controller/Method fields and JSON parameter editing
-- **Closeable Action Management** - Add/remove actions with intuitive tab interface
-- **Smart JSON Error Handling** - User choice dialogs for handling invalid JSON scenarios
-- **Enhanced Text Editing** - Context menu with Cut/Copy/Paste and line wrapping toggle
-- **Real-time Change Detection** - Immediate request updates when editing parameters
-- **Dark Mode Support** - Proper theme integration with Burp Suite
-- **LWC & Aura Descriptor Discovery** - Automatically extracts Apex controller methods and parameters from JavaScript files for both Lightning Web Components (LWC) and Aura framework applications
-
-## Screenshots
-
-### Main Interface
-![Auraditor Main Interface](examples/burp_tool_tab.png)
-*Comprehensive Lightning/Aura framework security testing interface with organized sections for Active/Passive Router Discovery, Object Discovery, and advanced request modification capabilities.*
-
 ### Request Editor
-![Request Editor Interface](examples/request.png)
-*Enhanced request editor with Aura Actions, Context, and Message tabs for detailed Lightning framework parameter analysis and modification.*
+- View and edit Aura actions in HTTP requests
+- Add and remove actions using tabs
+- Edit controller names and method names
+- Modify JSON parameters for each action
+- Choose how to handle invalid JSON
+- Copy, cut, and paste in text fields
+- Toggle line wrapping for better readability
+
+### Base Requests Management
+- Save multiple base requests from HTTP history
+- Tag requests with custom names
+- Use saved requests for security testing operations
+
+### Discovery Operations
+- Find Aura controllers and methods from JavaScript files
+- Discover Lightning Web Component (LWC) endpoints
+- Extract API routes from application files
+- Search for objects by name in the application
+
+### Route Testing
+- Test discovered routes automatically
+- Categorize routes by response type
+- Export results to files
+
+### Salesforce ID Tools
+- Analyze Salesforce ID structure and format
+- Convert between 15-character and 18-character IDs
+- Generate sequential Salesforce IDs
+- Create custom ID payload generators for Burp Intruder
+- Change decimal values in Salesforce IDs
 
 ## Requirements
-- Java 21 or higher (required for latest Burp Suite 2025 performance optimizations)
-- Burp Suite Professional 2025.x or later (for Montoya API support)
+- Java 21 or higher
+- Burp Suite Professional 2025.x or later
 
 ## Building
 
@@ -64,101 +75,90 @@ mvn clean package
 ```
 
 ### Using VS Code:
-The project includes VS Code tasks for building:
 - Press `Ctrl+Shift+P` and run "Tasks: Run Task"
 - Select "Maven: Package" for a complete build
 
 ## Installing
 In Burp Suite:
-- Go to Extensions -> Installed
-- Click "Add" 
+- Go to Extensions → Installed
+- Click "Add"
 - Locate the compiled jar file: `target/auraditor-*.jar`
 - Click "Next" to install
 
 ## Technical Details
 
-### Modern Technology Stack
-- **Burp Suite Integration** - Built with Montoya API for maximum compatibility
-- **Java 21 LTS** - Latest Java features and improved performance optimizations
-- **Jackson JSON Processing** - Robust JSON parsing and manipulation
-- **Swing UI Components** - Native look and feel with dark mode support
+### Built With
+- Burp Suite Montoya API
+- Java 21
+- Jackson JSON library
+- Swing UI
 
-### Key Improvements Over Original
-- **Complete API Modernization** - Migrated from legacy Burp API to modern Montoya API
-- **Enhanced User Experience** - Closeable tabs, context menus, smart error handling
-- **Better Dark Mode Support** - Proper theme integration and text visibility
-- **Real-time Change Detection** - Fixed issues where edits weren't being sent to server
-- **Improved Error Handling** - User choice dialogs and smart error state management
+### What Changed From Original
+- Updated to modern Burp Suite API
+- Added tabs for managing actions
+- Fixed dark mode text visibility
+- Added context menus for text editing
+- Fixed request updates not being sent
+- Added user dialogs for error handling
+- Added discovery features for Lightning components
 
-### Security Testing Features
-- **Lightning/Aura Request Parsing** - Automatic detection and parsing of Aura framework requests
-- **Parameter Manipulation** - Edit controller, method, and JSON parameters with validation
-- **Invalid JSON Testing** - Option to send malformed JSON for edge case testing
-- **Request Modification** - Real-time request updates with immediate feedback
-- **Comprehensive Descriptor Discovery** - Extract Apex endpoints and parameters from both:
-  - **Aura Framework** - Traditional Lightning components and actions
-  - **Lightning Web Components (LWC)** - Modern web components with multiple detection strategies:
-    - Direct `.default({params})` call patterns
-    - Conditional/ternary call patterns
-    - Method reference patterns (cross-module usage)
-    - Ternary selection patterns (shared parameter objects)
+## Versioning
 
-## Contributors
-
-**Auraditor (Professional Security Testing Tool):**
-- **Soroush Dalili** ([@irsdl](https://github.com/irsdl)) - Project maintainer, enhanced features, modernization, and improvements
-- **AI Collaboration** - Technical implementation, API migration, and code optimization!
-
-
-
-## Versioning Strategy
-
-This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH):
-
-- **MAJOR** (x.0.0): Breaking changes, complete API rewrites, major architectural changes
-- **MINOR** (2.x.0): New features, enhancements, significant improvements (backward compatible)
-- **PATCH** (2.1.x): Bug fixes, small improvements, security updates
-
-**Release Examples:**
-- `2.0.1` → `2.0.2`: Bug fixes, minor UI improvements  
-- `2.0.1` → `2.1.0`: New features like additional context menus, more Lightning framework support
-- `2.0.1` → `3.0.0`: Major rewrite, breaking changes to extension structure
-
-JAR files include the full version: `auraditor-2.0.1.jar`
+This project uses [Semantic Versioning](https://semver.org/):
+- **MAJOR** (x.0.0): Breaking changes
+- **MINOR** (2.x.0): New features
+- **PATCH** (2.1.x): Bug fixes
 
 ## Project Status
 
-**Independent Enhanced Project** - Active development with modern features:
+- ✅ Active development with new features
+- ✅ Uses Burp Suite Montoya API (2025.8)
+- ✅ Independent project, not affiliated with Salesforce
+- ⚠️ No official support, use at your own risk
 
-- ✅ **Active Development**: Maintained and enhanced with new features
-- ✅ **Modern API**: Updated to Burp Suite Montoya API (2025.8)
-- ✅ **Enhanced UX**: Closeable tabs, context menus, smart error handling
-- ✅ **Independent**: Not affiliated with or supported by Salesforce
-- ⚠️ **No Official Support**: Community-driven development, use at your own risk
+## Screenshots
 
-## Additional Resources & Inspiration
+### Main Interface
+![Auraditor Main Interface](examples/burp_tool_tab.png)
 
-### Recommended Reading
+The main tab shows options for discovering routes, testing endpoints, and managing base requests.
 
-**Security Testing Guides:**
-- [**Salesforce Penetration Testing Fundamentals**](https://projectblack.io/blog/salesforce-penetration-testing-fundamentals/) - Comprehensive guide to Salesforce security testing methodologies
-- [**Exposing Broken Access Controls in Salesforce-based Applications**](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/) - In-depth analysis of access control vulnerabilities in Salesforce applications
-- [**Misconfigured Salesforce Experiences**](https://www.varonis.com/blog/misconfigured-salesforce-experiences) - Common misconfigurations and security issues in Salesforce implementations
+### Request Editor
+![Request Editor Interface](examples/request.png)
 
-**Salesforce ID Technical References:**
-- [**Salesforce IDs Explained**](https://codebycody.com/salesforce-ids-explained/) - Detailed explanation of Salesforce ID structure and format
-- [**Salesforce's Algorithm for Converting IDs from 15 to 18 Characters**](https://codebycody.com/salesforces-algorithm-for-converting-ids-from-15-to-18-characters/) - Checksum algorithm breakdown
-- [**Salesforce Object Key Prefixes**](https://help.salesforce.com/s/articleView?id=000385203&type=1) - Official Salesforce documentation on object prefixes
-- [**Obscure Salesforce Object Key Prefixes**](https://www.fishofprey.com/2011/09/obscure-salesforce-object-key-prefixes.html) - Additional object prefix reference
+The request editor adds tabs to view and edit Aura actions, context, and messages.
 
-### Acknowledgments
-Special thanks to the following projects for inspiration and advancing Salesforce security testing:
+### Salesforce ID Tools
+![Salesforce ID Tools](examples/id_analyzer_generator.png)
 
-- **[aura-dump](https://github.com/prjblk/aura-dump)** - Innovative tool for Aura framework exploration and data extraction
-- **[AuraIntruder](https://github.com/pingidentity/AuraIntruder/)** - Automated Burp Suite extension for Aura framework security testing
+Tools for analyzing Salesforce IDs and generating custom payloads for testing.
 
-These projects have contributed valuable insights to the Salesforce security testing community and helped shape modern approaches to Lightning/Aura framework assessment.
+## Additional Resources
 
-### Original Foundation
-This project builds upon the foundation of the original [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) project (now archived). Auraditor represents a significant evolution with extensive modernization, new features, and improved user experience as an independent project with its own development direction.
+### Security Testing Guides
+- [Salesforce Penetration Testing Fundamentals](https://projectblack.io/blog/salesforce-penetration-testing-fundamentals/)
+- [Exposing Broken Access Controls in Salesforce-based Applications](https://cilynx.com/penetration-testing/exposing-broken-access-controls-in-salesforce-based-applications/2047/)
+- [Misconfigured Salesforce Experiences](https://www.varonis.com/blog/misconfigured-salesforce-experiences)
 
+### Salesforce ID Documentation
+- [Salesforce IDs Explained](https://codebycody.com/salesforce-ids-explained/)
+- [Converting IDs from 15 to 18 Characters](https://codebycody.com/salesforces-algorithm-for-converting-ids-from-15-to-18-characters/)
+- [Salesforce Object Key Prefixes](https://help.salesforce.com/s/articleView?id=000385203&type=1)
+- [Obscure Salesforce Object Key Prefixes](https://www.fishofprey.com/2011/09/obscure-salesforce-object-key-prefixes.html)
+
+## Related Projects
+
+These projects provide additional tools for Salesforce security testing:
+- [aura-dump](https://github.com/prjblk/aura-dump) - Tool for exploring Aura framework data
+- [AuraIntruder](https://github.com/pingidentity/AuraIntruder/) - Automated Aura framework testing extension
+
+## Credits
+
+This project builds upon [salesforce/lightning-burp](https://github.com/salesforce/lightning-burp) (now archived).
+
+Auraditor is a complete rewrite with modern API, new features, and independent development.
+
+## Contributors
+
+- **Soroush Dalili** ([@irsdl](https://github.com/irsdl)) - Project maintainer
+- **AI Collaboration** - Technical implementation and code optimization
