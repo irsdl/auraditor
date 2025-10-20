@@ -160,7 +160,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
     
@@ -185,7 +185,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
 
@@ -210,7 +210,7 @@ public class AuraditorSuiteTab {
             resultsTabbedPane.setSelectedIndex(resultsTabbedPane.getTabCount() - 1);
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
 
@@ -255,7 +255,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
 
@@ -303,7 +303,7 @@ public class AuraditorSuiteTab {
             }
             
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
     
@@ -400,7 +400,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
 
@@ -450,7 +450,7 @@ public class AuraditorSuiteTab {
             }
 
             // Switch to Results tab in main tabbed pane
-            tabbedPane.setSelectedIndex(2); // Results tab index
+            tabbedPane.setSelectedIndex(3); // Results tab index
         });
     }
 
