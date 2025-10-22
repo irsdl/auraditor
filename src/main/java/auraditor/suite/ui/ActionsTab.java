@@ -7678,10 +7678,12 @@ public class ActionsTab {
             discoveredJSPaths.clear();
             discoveredDescriptors.clear();
 
-            // Generate result IDs for each search type
-            String routerPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
-            String jsPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
-            String descriptorsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+            // Generate ONE result ID for all three search types
+            // "Perform All" should always create/update a single tab regardless of "Always create new tab" setting
+            String consolidatedResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+            String routerPathsResultId = consolidatedResultId;
+            String jsPathsResultId = consolidatedResultId;
+            String descriptorsResultId = consolidatedResultId;
 
             // Initialize results objects for all searches
             currentRouterPathsResults = new RouteDiscoveryResult();
