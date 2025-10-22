@@ -6960,6 +6960,7 @@ public class ActionsTab {
         private final List<BaseRequest> baseRequests;
         private final String requestId;
         private final MontoyaApi api;
+        private final java.util.Map<String, String> recordDataMap; // Maps recordId -> recordData
 
         public RetrievedRecordsResultPanel(String recordId, String recordData, List<BaseRequest> baseRequests, String requestId, MontoyaApi api) {
             this.recordId = recordId;
@@ -6967,6 +6968,8 @@ public class ActionsTab {
             this.baseRequests = baseRequests;
             this.requestId = requestId;
             this.api = api;
+            this.recordDataMap = new java.util.HashMap<>();
+            this.recordDataMap.put(recordId, recordData); // Store initial record
             this.setLayout(new BorderLayout());
 
             // Create shared toolbar
@@ -7004,7 +7007,13 @@ public class ActionsTab {
                 if (!e.getValueIsAdjusting()) {
                     String selectedRecord = recordList.getSelectedValue();
                     if (selectedRecord != null) {
-                        dataArea.setText(recordData);
+                        // Get the data for the selected record from the map
+                        String data = recordDataMap.get(selectedRecord);
+                        if (data != null) {
+                            dataArea.setText(data);
+                        } else {
+                            dataArea.setText(""); // Clear if no data found
+                        }
                         // Re-run search if there's active search text, otherwise clear
                         if (searchField != null && !searchField.getText().trim().isEmpty()) {
                             performSearch();
@@ -7161,10 +7170,15 @@ public class ActionsTab {
          * Add a new record to the panel
          */
         public void addRecord(String recordId, String recordData) {
+            // Store the data in the map
+            recordDataMap.put(recordId, recordData);
+
+            // Add to list model
             DefaultListModel<String> model = (DefaultListModel<String>) recordList.getModel();
             model.addElement(recordId);
+
+            // Select the new record (this will trigger the selection listener to update dataArea)
             recordList.setSelectedIndex(model.getSize() - 1);
-            dataArea.setText(recordData);
         }
 
         /**
