@@ -7679,9 +7679,15 @@ public class ActionsTab {
             discoveredDescriptors.clear();
 
             // Generate result IDs for each search type
-            String routerPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
-            String jsPathsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
-            String descriptorsResultId = generateRouteDiscoveryResultIdWithReuseCheck();
+            // For "Perform All", we need THREE SEPARATE tabs, so force-increment counter for each
+            routeDiscoveryResultCounter++;
+            String routerPathsResultId = "Discovered Routes " + routeDiscoveryResultCounter;
+
+            routeDiscoveryResultCounter++;
+            String jsPathsResultId = "Discovered Routes " + routeDiscoveryResultCounter;
+
+            routeDiscoveryResultCounter++;
+            String descriptorsResultId = "Discovered Routes " + routeDiscoveryResultCounter;
 
             // Initialize results objects for all searches
             currentRouterPathsResults = new RouteDiscoveryResult();
