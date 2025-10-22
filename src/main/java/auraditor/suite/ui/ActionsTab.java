@@ -5065,12 +5065,15 @@ public class ActionsTab {
             // Add selection listener to update object list
             categoryList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
+                    // Clear any active search highlighting first
+                    clearSearch();
+
+                    // Update the object list for the newly selected category
                     updateObjectList();
-                    // Re-run search if there's active search text, otherwise clear
+
+                    // Re-run search if there's active search text to highlight matches in new content
                     if (searchField != null && !searchField.getText().trim().isEmpty()) {
                         performSearch();
-                    } else {
-                        clearSearch();
                     }
                 }
             });
@@ -5519,12 +5522,15 @@ public class ActionsTab {
             // Setup category selection listener
             categoryList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
+                    // Clear any active search highlighting first
+                    clearSearch();
+
+                    // Update the route display for the newly selected category
                     updateRouteDisplay();
-                    // Re-run search if there's active search text, otherwise clear
+
+                    // Re-run search if there's active search text to highlight matches in new content
                     if (searchField != null && !searchField.getText().trim().isEmpty()) {
                         performSearch();
-                    } else {
-                        clearSearch();
                     }
                 }
             });
@@ -5998,12 +6004,16 @@ public class ActionsTab {
             // Add selection listener to update JSON data
             objectList.addListSelectionListener(e -> {
                 if (!e.getValueIsAdjusting()) {
+                    // Clear any active search highlighting first
+                    // This ensures the new content is displayed without old highlighting interfering
+                    clearSearch();
+
+                    // Update the JSON data for the newly selected object
                     updateJsonData();
-                    // Re-run search if there's active search text, otherwise clear
+
+                    // Re-run search if there's active search text to highlight matches in new content
                     if (searchField != null && !searchField.getText().trim().isEmpty()) {
                         performSearch();
-                    } else {
-                        clearSearch();
                     }
                 }
             });
@@ -7033,6 +7043,10 @@ public class ActionsTab {
                 if (!e.getValueIsAdjusting()) {
                     String selectedRecord = recordList.getSelectedValue();
                     if (selectedRecord != null) {
+                        // Clear any active search highlighting first
+                        // This ensures the new content is displayed without old highlighting interfering
+                        clearSearch();
+
                         // Get the data for the selected record from the map
                         String data = recordDataMap.get(selectedRecord);
                         if (data != null) {
@@ -7040,11 +7054,10 @@ public class ActionsTab {
                         } else {
                             dataArea.setText(""); // Clear if no data found
                         }
-                        // Re-run search if there's active search text, otherwise clear
+
+                        // Re-run search if there's active search text to highlight matches in new content
                         if (searchField != null && !searchField.getText().trim().isEmpty()) {
                             performSearch();
-                        } else {
-                            clearSearch();
                         }
                     }
                 }
