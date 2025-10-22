@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.github.irsdl.auraditor</groupId>
 	<artifactId>auraditor</artifactId>
-	<version>2.0.4</version>
+	<version>2.0.5</version>
 	<packaging>jar</packaging>
 
 	<name>Auraditor</name>
