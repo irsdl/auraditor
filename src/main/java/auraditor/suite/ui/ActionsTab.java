@@ -5311,8 +5311,12 @@ public class ActionsTab {
         }
         
         private void updateObjectList() {
-            // Save current scroll position to preserve it during updates
-            int currentCaretPosition = objectListArea.getCaretPosition();
+            // Save current scroll position using the scrollpane's viewport
+            JScrollPane scrollPane = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, objectListArea);
+            java.awt.Point viewPosition = null;
+            if (scrollPane != null) {
+                viewPosition = scrollPane.getViewport().getViewPosition();
+            }
 
             String selectedCategory = categoryList.getSelectedValue();
             if (selectedCategory == null) return;
@@ -5338,15 +5342,16 @@ public class ActionsTab {
 
             objectListArea.setText(content.toString());
 
-            // Restore scroll position if valid, otherwise scroll to top
-            try {
-                if (currentCaretPosition > 0 && currentCaretPosition < objectListArea.getText().length()) {
-                    objectListArea.setCaretPosition(currentCaretPosition);
-                } else {
-                    objectListArea.setCaretPosition(0);
-                }
-            } catch (IllegalArgumentException e) {
-                objectListArea.setCaretPosition(0);
+            // Restore scroll position after content update
+            if (scrollPane != null && viewPosition != null) {
+                final java.awt.Point finalViewPosition = viewPosition;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        scrollPane.getViewport().setViewPosition(finalViewPosition);
+                    } catch (Exception e) {
+                        // Ignore if position is invalid
+                    }
+                });
             }
 
             // Clear search when content changes
@@ -5577,8 +5582,12 @@ public class ActionsTab {
         }
 
         private void updateRouteDisplay() {
-            // Save current scroll position to preserve it during updates
-            int currentCaretPosition = routeListArea.getCaretPosition();
+            // Save current scroll position using the scrollpane's viewport
+            JScrollPane scrollPane = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, routeListArea);
+            java.awt.Point viewPosition = null;
+            if (scrollPane != null) {
+                viewPosition = scrollPane.getViewport().getViewPosition();
+            }
 
             String selectedCategory = categoryList.getSelectedValue();
             if (selectedCategory == null) {
@@ -5604,15 +5613,16 @@ public class ActionsTab {
 
             routeListArea.setText(content.toString());
 
-            // Restore scroll position if valid, otherwise scroll to top
-            try {
-                if (currentCaretPosition > 0 && currentCaretPosition < routeListArea.getText().length()) {
-                    routeListArea.setCaretPosition(currentCaretPosition);
-                } else {
-                    routeListArea.setCaretPosition(0);
-                }
-            } catch (IllegalArgumentException e) {
-                routeListArea.setCaretPosition(0);
+            // Restore scroll position after content update
+            if (scrollPane != null && viewPosition != null) {
+                final java.awt.Point finalViewPosition = viewPosition;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        scrollPane.getViewport().setViewPosition(finalViewPosition);
+                    } catch (Exception e) {
+                        // Ignore if position is invalid
+                    }
+                });
             }
         }
 
@@ -6281,26 +6291,31 @@ public class ActionsTab {
         }
         
         private void updateJsonData() {
-            // Save current scroll position to preserve it during updates
-            int currentCaretPosition = jsonDataArea.getCaretPosition();
+            // Save current scroll position using the scrollpane's viewport
+            JScrollPane scrollPane = (JScrollPane) SwingUtilities.getAncestorOfClass(JScrollPane.class, jsonDataArea);
+            java.awt.Point viewPosition = null;
+            if (scrollPane != null) {
+                viewPosition = scrollPane.getViewport().getViewPosition();
+            }
 
             String selectedObject = objectList.getSelectedValue();
             if (selectedObject != null) {
                 String jsonData = currentObjectData.get(selectedObject);
                 jsonDataArea.setText(jsonData != null ? jsonData : "No data available");
-
-                // Restore scroll position if valid, otherwise scroll to top
-                try {
-                    if (currentCaretPosition > 0 && currentCaretPosition < jsonDataArea.getText().length()) {
-                        jsonDataArea.setCaretPosition(currentCaretPosition);
-                    } else {
-                        jsonDataArea.setCaretPosition(0);
-                    }
-                } catch (IllegalArgumentException e) {
-                    jsonDataArea.setCaretPosition(0);
-                }
             } else {
                 jsonDataArea.setText("Select an object to view its data");
+            }
+
+            // Restore scroll position after content update
+            if (scrollPane != null && viewPosition != null) {
+                final java.awt.Point finalViewPosition = viewPosition;
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        scrollPane.getViewport().setViewPosition(finalViewPosition);
+                    } catch (Exception e) {
+                        // Ignore if position is invalid
+                    }
+                });
             }
         }
 
