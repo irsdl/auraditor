@@ -95,6 +95,11 @@ public class AuraditorSuiteTab {
             public void createRetrievedRecordsTab(String resultId, String recordId, String recordData) {
                 AuraditorSuiteTab.this.createRetrievedRecordsTab(resultId, recordId, recordData);
             }
+
+            @Override
+            public void onOperationStateChanged(boolean isRunning) {
+                AuraditorSuiteTab.this.updateActionsTabTitle(isRunning);
+            }
         });
         this.tabbedPane.addTab("Actions", actionsTab.getComponent());
         
@@ -146,6 +151,31 @@ public class AuraditorSuiteTab {
             }
         }
         api.logging().logToError("Could not find tab with name: " + tabName);
+    }
+
+    /**
+     * Update the Actions tab title to show operation status
+     * @param isRunning Whether an operation is currently running
+     */
+    private void updateActionsTabTitle(boolean isRunning) {
+        SwingUtilities.invokeLater(() -> {
+            for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+                String title = tabbedPane.getTitleAt(i);
+                // Remove any existing " (In Progress)" suffix
+                if (title.endsWith(" (In Progress)")) {
+                    title = title.substring(0, title.length() - 14);
+                }
+                // Check if this is the Actions tab (by comparing base name)
+                if (title.equals("Actions")) {
+                    if (isRunning) {
+                        tabbedPane.setTitleAt(i, "Actions (In Progress)");
+                    } else {
+                        tabbedPane.setTitleAt(i, "Actions");
+                    }
+                    return;
+                }
+            }
+        });
     }
 
     /**

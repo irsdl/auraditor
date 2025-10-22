@@ -331,6 +331,11 @@ public class ActionsTab {
             // Default implementation falls back to createObjectByNameTab
             createObjectByNameTab(resultId, objectByNameResult);
         }
+
+        // New method for notifying operation state changes (for updating tab title)
+        default void onOperationStateChanged(boolean isRunning) {
+            // Default implementation does nothing
+        }
     }
     
     private final MontoyaApi api;
@@ -872,6 +877,9 @@ public class ActionsTab {
         // Hide progress for non-bulk operations
         progressLabel.setVisible(false);
 
+        // Notify parent that operation is running
+        resultTabCallback.onOperationStateChanged(true);
+
         statusPanel.revalidate();
         statusPanel.repaint();
     }
@@ -904,6 +912,9 @@ public class ActionsTab {
         // Re-enable buttons based on current state
         updateUIForRequestAvailability(!baseRequests.isEmpty());
         clearStatusMessage();
+
+        // Notify parent that operation is no longer running
+        resultTabCallback.onOperationStateChanged(false);
     }
     
     /**
