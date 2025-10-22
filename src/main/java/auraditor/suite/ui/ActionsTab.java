@@ -6015,7 +6015,8 @@ public class ActionsTab {
          * Update the panel with new data without recreating the entire panel
          */
         public void updateWithNewData(ObjectByNameResult newObjectByNameResult) {
-            // Store current filter state
+            // Store current selection and filter state
+            String currentSelection = objectList.getSelectedValue();
             String currentFilterText = filterField.getText().trim();
             boolean hasActiveFilter = !currentFilterText.isEmpty() || hideEmptyCheckBox.isSelected();
 
@@ -6043,8 +6044,22 @@ public class ActionsTab {
                 objectList.setModel(originalObjectModel); // Use original model when no filter
             }
 
-            // Reset selection
-            if (originalObjectModel.getSize() > 0) {
+            // Restore previous selection if it still exists, otherwise select first item
+            if (currentSelection != null) {
+                boolean found = false;
+                for (int i = 0; i < objectList.getModel().getSize(); i++) {
+                    if (objectList.getModel().getElementAt(i).equals(currentSelection)) {
+                        objectList.setSelectedIndex(i);
+                        found = true;
+                        break;
+                    }
+                }
+                // If previous selection not found and we have items, select first
+                if (!found && objectList.getModel().getSize() > 0) {
+                    objectList.setSelectedIndex(0);
+                }
+            } else if (objectList.getModel().getSize() > 0) {
+                // No previous selection, select first item
                 objectList.setSelectedIndex(0);
             }
 
