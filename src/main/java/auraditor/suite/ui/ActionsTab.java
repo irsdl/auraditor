@@ -7023,47 +7023,33 @@ public class ActionsTab {
          * Add mouse listener to record list for right-click context menu
          */
         private void addMouseListenerToRecordList() {
-            // Remove ALL existing mouse listeners to prevent interference
-            java.awt.event.MouseListener[] existingListeners = recordList.getMouseListeners();
-            for (java.awt.event.MouseListener listener : existingListeners) {
-                recordList.removeMouseListener(listener);
-            }
-
-            // Add a single mouse listener that handles popup properly
+            // Add mouse listener for context menu without removing default behavior
             java.awt.event.MouseAdapter mouseAdapter = new java.awt.event.MouseAdapter() {
                 @Override
                 public void mousePressed(java.awt.event.MouseEvent e) {
-                    // Handle selection on any click
-                    handleSelection(e);
-                    // Only show popup on popup trigger
+                    // Handle selection before showing menu
                     if (e.isPopupTrigger()) {
-                        showContextMenu(e);
+                        handleSelectionAndShowMenu(e);
                     }
                 }
 
                 @Override
                 public void mouseReleased(java.awt.event.MouseEvent e) {
-                    // Only show popup on popup trigger (for Mac compatibility)
+                    // Mac/Windows compatibility - popup trigger on release
                     if (e.isPopupTrigger()) {
-                        showContextMenu(e);
+                        handleSelectionAndShowMenu(e);
                     }
                 }
 
-                private void handleSelection(java.awt.event.MouseEvent e) {
-                    int index = recordList.locationToIndex(e.getPoint());
-                    if (index >= 0 && index < recordList.getModel().getSize()) {
-                        recordList.setSelectedIndex(index);
-                    }
-                }
-
-                private void showContextMenu(java.awt.event.MouseEvent e) {
+                private void handleSelectionAndShowMenu(java.awt.event.MouseEvent e) {
                     int index = recordList.locationToIndex(e.getPoint());
 
                     if (index >= 0 && index < recordList.getModel().getSize()) {
-                        // Ensure item is selected (may already be selected from handleSelection)
+                        // Select item under cursor if not already selected
                         if (recordList.getSelectedIndex() != index) {
                             recordList.setSelectedIndex(index);
                         }
+
                         String selectedValue = recordList.getSelectedValue();
 
                         javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
