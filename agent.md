@@ -38,6 +38,121 @@ git submodule update --remote
 ```
 Or use the provided update script: `update-external-refs.cmd`
 
+---
+
+## AI Development Guidelines
+
+### Task Planning & Approval Process
+
+**CRITICAL**: Before implementing any task:
+1. **Write a detailed implementation plan** in a markdown file with date/time stamp
+2. **Store the plan** in [ai-context/tasks/latest.md](ai-context/tasks/latest.md) for review
+3. **Wait for user approval** before proceeding with implementation
+4. **Delete the plan file** once the task is completed and user is satisfied
+
+### Large Task Management
+
+⚠️ **WARNING**: Having AI implement large tasks is a recipe for failure!
+
+**Before starting any large task**:
+- **Remind the user** about the risks of large AI implementations
+- **Get explicit approval** before proceeding
+- **Break tasks into smaller pieces** using a task tree decomposition approach
+- **Decompose until leaves are simple** enough for AI to implement reliably
+- **Be super prescriptive** with clear objectives, detailed requirements, and explicit examples
+
+**Use branching** when:
+- Changes need to be done in different ways to compare options
+- You're not sure about a change and want to explore alternatives
+- **Remind the user about branching** when these situations arise
+
+### Code Quality Standards
+
+**Excellence is non-negotiable**:
+- ✨ **Conciseness** - Write clear, compact code without verbosity
+- 📖 **Readability** - Code should be self-documenting and easy to understand
+- 🎯 **Elegance** - Prefer simple, beautiful solutions over complex ones
+- 🔄 **Consistency** - Follow existing patterns and naming conventions
+- 📏 **Smallest solutions** - Always use the minimal approach to achieve goals
+
+### Design Principles
+
+**File Management**:
+- ❌ **DO NOT create files longer than 2000 lines**
+- ✅ **Break into multiple modular files** instead
+- ⚠️ **If this changes the design, GET APPROVAL FIRST**
+
+**Code Structure**:
+- ❌ **Avoid heavily nested calls or functions**
+- ✅ **Keep code flat and modular**
+- ✅ **Use clear, descriptive names** (not "Tab 1", "Module 2", etc.)
+
+### Change Management & Git
+
+**Every change must be tracked**:
+- 📝 **Create detailed commit messages** explaining:
+  - WHAT changed
+  - WHY it was changed (rationale and context)
+  - Makes rollback decisions easier
+- 🔍 **Use git for all tracking** to maintain complete history
+
+### Safety & Constraints
+
+**ABSOLUTE RULES - No exceptions without approval**:
+
+1. **Libraries & Frameworks**
+   - ❌ DO NOT add new libraries or frameworks without explicit approval
+   - ✅ Provide justification when requesting new dependencies
+
+2. **Module Interfaces**
+   - ❌ DO NOT change existing module interfaces without explicit approval
+   - ⚠️ Interface changes can break dependent code
+
+3. **Regular Expressions**
+   - ❌ NEVER change existing regex patterns unless explicitly asked
+   - ⚠️ If in doubt, ASK THE USER before proceeding
+
+4. **Unrelated Modules**
+   - ❌ DO NOT touch modules not defined by the task
+   - ℹ️ If you identify an error elsewhere, INFORM THE USER and let them decide
+
+### Testing Requirements
+
+**Test-Driven Approach**:
+
+1. **Write test plans BEFORE code**:
+   - Unit tests for individual functions
+   - Mock tests for dependencies
+   - Regression tests for existing functionality
+   - Store tests in a separate directory
+
+2. **Test Quality Assurance**:
+   - ✅ Check test quality after writing
+   - 👁️ **Remind user to eyeball the tests** themselves
+   - ⚠️ **NEVER disable, remove, or change test suites** without user confirmation
+
+3. **Test Execution Strategy**:
+   - 💰 **Running tests separate from AI saves money**
+   - ✅ Implement separate test execution when possible
+   - 📊 Tests should be runnable independently after changes
+
+### MCP Integration
+
+**Leverage MCP when beneficial**:
+- 🔍 **Identify opportunities** to use Model Context Protocol
+- 💡 **Example**: UI design MCP can provide visual feedback instead of working blind
+- ✋ **Ask user to provide** the appropriate MCP when identified
+- 📢 **Clearly explain** what MCP would help and why
+
+### Naming Conventions
+
+**Be explicit and clear**:
+- ✅ Use descriptive names: `ActionsTab`, `SitemapSearchTab`, `ResultsManager`
+- ❌ Avoid generic names: "Tab 1", "Module 2", "Handler 3"
+- 📛 Names should reveal intent and purpose
+
+---
+
 ## Key Architecture Points
 
 ### Main Files:

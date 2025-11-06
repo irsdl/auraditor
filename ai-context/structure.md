@@ -11,6 +11,9 @@ Auraditor is a Burp Suite extension for security testing of Salesforce Lightning
 auraditor/
 ├── ai-context/              # AI-consumable files and documentation
 │   ├── structure.md         # This file - project structure documentation
+│   ├── tasks/               # Task planning files
+│   │   ├── .gitkeep         # Placeholder
+│   │   └── latest.md        # Current task plan (created before implementation)
 │   └── temp/                # Temporary AI files (screenshots, samples, etc.)
 │       └── .gitkeep         # Placeholder (contents ignored by git)
 │
@@ -109,6 +112,10 @@ Update these with: `git submodule update --remote` or `update-external-refs.cmd`
 
 ### AI Context (`ai-context/`)
 - **`structure.md`** - This file, explaining project organization
+- **`tasks/`** - Task planning and implementation files
+  - **`latest.md`** - Current task implementation plan (created before coding)
+  - AI must write plan here and get approval before implementing
+  - Delete plan file after task completion and user satisfaction
 - **`temp/`** - Place for temporary AI-consumable files (screenshots, code samples, etc.)
   - Contents are ignored by git (except `.gitkeep`)
   - AI agents should look here for user-provided samples/screenshots
