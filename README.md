@@ -93,6 +93,15 @@ In Burp Suite:
 - Jackson JSON library
 - Swing UI
 
+## Development Methodology
+
+This extension is developed using a multi‑agent workflow and the Vibe coding technique:
+- Multiple AI agents (e.g., Claude, ChatGPT) collaborate under a strict planning and approval process defined in `agent.md`.
+- Each agent prepares an implementation plan in `ai-context/tasks/{agent}-latest.md`, which is reviewed and approved before any changes.
+- Commits are authored by the maintainer and co‑signed by contributing AI agents using GitHub‑recognized `Co-Authored-By` trailers.
+
+See `agent.md` for the full AI development guidelines and workflows.
+
 ### What Changed From Original
 - Updated to modern Burp Suite API
 - Added tabs for managing actions

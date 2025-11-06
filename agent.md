@@ -141,6 +141,14 @@ Or use the provided update script: `update-external-refs.cmd`
   - Makes rollback decisions easier
 - 🔍 **Use git for all tracking** to maintain complete history
 
+**Commit Authorship (Multi‑Agent)**
+- ✅ When an AI agent contributes code, commits should be authored by the human maintainer (e.g., `Soroush Dalili <1798313+irsdl@users.noreply.github.com>`) and co‑signed by the AI agent(s).
+- ✅ Add one trailer per AI agent in the commit message:
+  - `Co-Authored-By: ChatGPT <noreply@openai.com>`
+  - `Co-Authored-By: Claude <noreply@anthropic.com>`
+- ✅ Keep identities consistent across commits for a clear audit trail.
+- ℹ️ Example: `git commit -m "Message" -m "" -m "Co-Authored-By: ChatGPT <noreply@openai.com>"`
+
 ### Safety & Constraints
 
 **ABSOLUTE RULES - No exceptions without approval**:
