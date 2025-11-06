@@ -24,7 +24,11 @@ public class AboutTab {
 
     // Extension information
     private static final String EXTENSION_NAME = "Auraditor";
-    private static final String VERSION = "2.0.3";
+    // Version is resolved dynamically from JAR manifest (Implementation-Version)
+    private static String resolveVersion() {
+        String v = AboutTab.class.getPackage().getImplementationVersion();
+        return (v != null && !v.trim().isEmpty()) ? v : "unknown";
+    }
     private static final String AUTHOR = "Soroush Dalili (@irsdl)";
     private static final String AUTHOR_URL = "https://x.com/irsdl";
     private static final String GITHUB_URL = "https://github.com/irsdl/auraditor";
@@ -90,7 +94,7 @@ public class AboutTab {
         infoPanel.add(versionTitleLabel, gbc);
 
         gbc.gridx = 1;
-        JLabel versionLabel = new JLabel(VERSION);
+        JLabel versionLabel = new JLabel(resolveVersion());
         versionLabel.setFont(new Font(versionLabel.getFont().getName(), Font.PLAIN, 15));
         infoPanel.add(versionLabel, gbc);
 
