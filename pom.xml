@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>io.github.irsdl.auraditor</groupId>
 	<artifactId>auraditor</artifactId>
-	<version>2.0.6</version>
+		<version>2.0.5</version>
 	<packaging>jar</packaging>
 
 	<name>Auraditor</name>
@@ -53,6 +53,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
+		<maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
 	</properties>
 	<build>
 		<plugins>
@@ -66,9 +67,18 @@
 						<goals>
 							<goal>shade</goal>
 						</goals>
-						<configuration>
-							<createDependencyReducedPom>false</createDependencyReducedPom>
-						</configuration>
+					<configuration>
+						<createDependencyReducedPom>false</createDependencyReducedPom>
+						<transformers>
+							<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<manifestEntries>
+										<Implementation-Title>Auraditor</Implementation-Title>
+										<Implementation-Version>${project.version}</Implementation-Version>
+										<Implementation-Build-Time>${maven.build.timestamp}</Implementation-Build-Time>
+									</manifestEntries>
+							</transformer>
+						</transformers>
+					</configuration>
 					</execution>
 				</executions>
 			</plugin>

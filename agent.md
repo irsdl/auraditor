@@ -55,7 +55,7 @@ When making ANY changes to this project, you MUST follow this workflow:
 5. **Commit changes** with: `git add . && git commit -m "Description of changes"`
 6. **Request user approval** to delete your task plan file after successful completion
 
-The final JAR file will be at `target/auraditor-2.0.6.jar` - this is what users load into Burp Suite.
+    The final JAR file will be at `target/auraditor-2.0.5.jar` - this is what users load into Burp Suite.
 
 ## Critical Resources - READ THESE FIRST
 
@@ -88,6 +88,7 @@ Or use the provided update script: `update-external-refs.cmd`
 2. **Store the plan** in `ai-context/tasks/{agent-name}-latest.md` for review
    - Examples: `claude-latest.md`, `chatgpt-latest.md`, `copilot-latest.md`, `gemini-latest.md`
 3. **Wait for user approval** before proceeding with implementation
+4. **Immediately re-read the approved task plan** in `ai-context/tasks/{agent-name}-latest.md` just before making changes, because users may add/remove steps or change details after initial review
 4. **Complete the task** fully:
    - Implement all changes
    - Compile successfully with `mvn clean package`

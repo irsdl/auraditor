@@ -14,6 +14,11 @@ import auraditor.suite.ui.SalesforceIdGeneratorManager;
 import auraditor.core.ThreadManager;
 import burp.api.montoya.BurpExtension;
 import burp.api.montoya.MontoyaApi;
+import java.io.InputStream;
+import java.net.URL;
+import java.util.Enumeration;
+import java.util.jar.Attributes;
+import java.util.jar.Manifest;
 
 public class BurpExtender implements BurpExtension {
 
@@ -26,9 +31,15 @@ public class BurpExtender implements BurpExtension {
 		this.api = api;
 		api.extension().setName("Auraditor");
 
-		// Log version and build information
-		String version = "2.0.3";
-		String buildDate = "2025-10-08 13:35";
+			// Log version and build information (from manifest)
+			String version = BurpExtender.class.getPackage().getImplementationVersion();
+			if (version == null || version.trim().isEmpty()) {
+				version = "unknown";
+			}
+			String buildDate = readManifestAttribute("Implementation-Build-Time");
+			if (buildDate == null || buildDate.trim().isEmpty()) {
+				buildDate = "unknown";
+			}
 		api.logging().logToOutput("=== Auraditor Extension Starting ===");
 		api.logging().logToOutput("Version: " + version);
 		api.logging().logToOutput("Build Date: " + buildDate);
@@ -65,12 +76,12 @@ public class BurpExtender implements BurpExtension {
 
 		// Register shutdown hook to ensure proper cleanup
 		api.extension().registerUnloadingHandler(this::cleanup);
-	}
+		}
 
-	/**
-	 * Cleanup method called when the extension is unloaded
-	 */
-	private void cleanup() {
+		/**
+		 * Cleanup method called when the extension is unloaded
+		 */
+		private void cleanup() {
 		api.logging().logToOutput("=== Auraditor Extension Cleanup Starting ===");
 
 		try {
@@ -89,7 +100,31 @@ public class BurpExtender implements BurpExtension {
 
 			api.logging().logToOutput("=== Auraditor Extension Cleanup Completed ===");
 		} catch (Exception e) {
-			api.logging().logToError("Error during cleanup: " + e.getMessage());
-		}
-	}
+    				api.logging().logToError("Error during cleanup: " + e.getMessage());
+    			}
+
+    		}
+
+    		/**
+			 * Read a manifest attribute from META-INF/MANIFEST.MF on the classpath.
+			 */
+			private static String readManifestAttribute(String name) {
+			try {
+				Enumeration<URL> resources = BurpExtender.class.getClassLoader().getResources("META-INF/MANIFEST.MF");
+				while (resources.hasMoreElements()) {
+					URL url = resources.nextElement();
+					try (InputStream is = url.openStream()) {
+						Manifest mf = new Manifest(is);
+						Attributes attrs = mf.getMainAttributes();
+						String val = attrs.getValue(name);
+						if (val != null) {
+							return val;
+						}
+					}
+				}
+			} catch (Exception ignored) {
+				// ignore read errors and fall back to null
+			}
+				return null;
+			}
 }
