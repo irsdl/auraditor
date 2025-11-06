@@ -18,12 +18,22 @@ The final JAR file will be at `target/auraditor-2.0.1.jar` - this is what users 
 ### Montoya API Documentation
 - **Official Javadoc**: https://portswigger.github.io/burp-extensions-montoya-api/javadoc/burp/api/montoya/MontoyaApi.html
 - **GitHub Repository**: https://github.com/PortSwigger/burp-extensions-montoya-api
+- **Local API Source**: [external-refs/montoya-api/](external-refs/montoya-api/) - Complete Montoya API source code (git submodule)
+- **Local Examples**: [external-refs/montoya-api-examples/](external-refs/montoya-api-examples/) - Official example extensions (git submodule)
 
 ### Before Writing Code:
-1. **Check the Montoya API documentation** for existing functionality
-2. **Search the GitHub repository** for examples and patterns
+1. **Check the local Montoya API source** in [external-refs/montoya-api/](external-refs/montoya-api/) for existing functionality and implementation details
+2. **Search the local examples** in [external-refs/montoya-api-examples/](external-refs/montoya-api-examples/) for patterns and sample code
 3. **DO NOT reinvent** functionality that already exists in Montoya
-4. **DO NOT hallucinate** API methods - always verify they exist in the documentation
+4. **DO NOT hallucinate** API methods - always verify they exist in the local source or documentation
+5. If needed, consult the online Javadoc for detailed method signatures and usage
+
+### Updating External References:
+The external reference repositories are git submodules and can be updated with:
+```bash
+git submodule update --remote
+```
+Or use the provided update script: `update-external-refs.cmd`
 
 ## Key Architecture Points
 

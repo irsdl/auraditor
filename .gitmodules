@@ -1,0 +1,6 @@
+[submodule "external-refs/montoya-api"]
+	path = external-refs/montoya-api
+	url = https://github.com/PortSwigger/burp-extensions-montoya-api.git
+[submodule "external-refs/montoya-api-examples"]
+	path = external-refs/montoya-api-examples
+	url = https://github.com/PortSwigger/burp-extensions-montoya-api-examples.git
