@@ -1,5 +1,10 @@
 # Auraditor Development Guide for AI Assistants
 
+## START HERE - Project Structure
+**FIRST**: Read [ai-context/structure.md](ai-context/structure.md) for a complete overview of the project folder structure, file locations, and where to find specific functionality. This will save time and tokens by giving you immediate context.
+
+**Temporary Files**: If you need to reference screenshots, code samples, or other temporary files, ask the user to place them in [ai-context/temp/](ai-context/temp/) for easy access.
+
 ## Project Overview
 Auraditor is a Burp Suite extension for testing Salesforce Lightning applications. It uses the Montoya API for Burp Suite integration.
 
@@ -16,8 +21,6 @@ The final JAR file will be at `target/auraditor-2.0.1.jar` - this is what users 
 ## Critical Resources - READ THESE FIRST
 
 ### Montoya API Documentation
-- **Official Javadoc**: https://portswigger.github.io/burp-extensions-montoya-api/javadoc/burp/api/montoya/MontoyaApi.html
-- **GitHub Repository**: https://github.com/PortSwigger/burp-extensions-montoya-api
 - **Local API Source**: [external-refs/montoya-api/](external-refs/montoya-api/) - Complete Montoya API source code (git submodule)
 - **Local Examples**: [external-refs/montoya-api-examples/](external-refs/montoya-api-examples/) - Official example extensions (git submodule)
 
@@ -206,3 +209,9 @@ When ready to submit to BApp Store:
 - [x] All dependencies bundled in JAR
 - [x] Clear, descriptive naming
 - [x] Works offline (no external network dependencies)
+
+---
+
+## Maintenance Reminder
+
+**IMPORTANT**: When you add, remove, or significantly reorganize folders or major files in this project, update [ai-context/structure.md](ai-context/structure.md) to reflect the changes. This keeps AI agents informed of the current project organization and prevents confusion.

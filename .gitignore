@@ -24,11 +24,14 @@ Auraditor.iml
 .claude/
 
 # Temporary and cache directories
-tempai/
 temp/
 tmp/
 .cache/
 .temp/
+
+# AI context - ignore temp folder contents but keep the folder
+ai-context/temp/*
+!ai-context/temp/.gitkeep
 
 # Log files
 *.log
