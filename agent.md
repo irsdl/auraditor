@@ -4,20 +4,36 @@
 
 **BEFORE DOING ANYTHING ELSE**, you MUST:
 
-1. ✍️ **CREATE** a detailed implementation plan in [ai-context/tasks/latest.md](ai-context/tasks/latest.md)
+1. ✍️ **CREATE** a detailed implementation plan in `ai-context/tasks/{agent-name}-latest.md`
+   - Replace `{agent-name}` with your AI agent identifier (lowercase):
+     - Claude → [ai-context/tasks/claude-latest.md](ai-context/tasks/claude-latest.md)
+     - ChatGPT → [ai-context/tasks/chatgpt-latest.md](ai-context/tasks/chatgpt-latest.md)
+     - Copilot → [ai-context/tasks/copilot-latest.md](ai-context/tasks/copilot-latest.md)
+     - Gemini → [ai-context/tasks/gemini-latest.md](ai-context/tasks/gemini-latest.md)
+     - Other agents → `ai-context/tasks/{your-name}-latest.md`
+
 2. 📅 **INCLUDE** date/time stamp in the plan
+
 3. 📋 **DOCUMENT**:
    - What you understand the task to be
    - Step-by-step implementation approach
    - Files that will be modified
    - Potential risks or considerations
    - Testing approach
+
 4. ⏸️ **WAIT** for user approval before proceeding
-5. ✅ **DELETE** the plan file only after task completion and user satisfaction
+
+5. ✅ **DELETE** the plan file only after:
+   - Task is completed
+   - Application compiled successfully (`mvn clean package`)
+   - Changes committed to git
+   - **USER HAS APPROVED FILE DELETION**
 
 **⛔ DO NOT SKIP THIS STEP - NO EXCEPTIONS ⛔**
 
 If you proceed with implementation without creating this plan first, you are violating the development workflow.
+
+**Multi-Agent Support**: Agent-specific file naming allows multiple AI agents to work on the project simultaneously without conflicts.
 
 ---
 
@@ -32,11 +48,12 @@ Auraditor is a Burp Suite extension for testing Salesforce Lightning application
 ## Essential Development Workflow
 When making ANY changes to this project, you MUST follow this workflow:
 
-1. **Create implementation plan** in [ai-context/tasks/latest.md](ai-context/tasks/latest.md) and wait for approval
+1. **Create implementation plan** in `ai-context/tasks/{agent-name}-latest.md` and wait for approval
 2. **Make your changes** to the Java source files
 3. **Compile and test** with: `mvn clean compile`
 4. **Package the JAR** with: `mvn clean package`
 5. **Commit changes** with: `git add . && git commit -m "Description of changes"`
+6. **Request user approval** to delete your task plan file after successful completion
 
 The final JAR file will be at `target/auraditor-2.0.6.jar` - this is what users load into Burp Suite.
 
@@ -68,9 +85,14 @@ Or use the provided update script: `update-external-refs.cmd`
 
 **CRITICAL**: Before implementing any task:
 1. **Write a detailed implementation plan** in a markdown file with date/time stamp
-2. **Store the plan** in [ai-context/tasks/latest.md](ai-context/tasks/latest.md) for review
+2. **Store the plan** in `ai-context/tasks/{agent-name}-latest.md` for review
+   - Examples: `claude-latest.md`, `chatgpt-latest.md`, `copilot-latest.md`, `gemini-latest.md`
 3. **Wait for user approval** before proceeding with implementation
-4. **Delete the plan file** once the task is completed and user is satisfied
+4. **Complete the task** fully:
+   - Implement all changes
+   - Compile successfully with `mvn clean package`
+   - Commit to git with detailed message
+5. **Request user approval to delete** the plan file only after all steps are complete
 
 ### Large Task Management
 

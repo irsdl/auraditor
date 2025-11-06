@@ -11,9 +11,12 @@ Auraditor is a Burp Suite extension for security testing of Salesforce Lightning
 auraditor/
 ├── ai-context/              # AI-consumable files and documentation
 │   ├── structure.md         # This file - project structure documentation
-│   ├── tasks/               # Task planning files
+│   ├── tasks/               # Task planning files (agent-specific)
 │   │   ├── .gitkeep         # Placeholder
-│   │   └── latest.md        # Current task plan (created before implementation)
+│   │   ├── claude-latest.md # Claude's current task plan
+│   │   ├── chatgpt-latest.md # ChatGPT's current task plan
+│   │   ├── copilot-latest.md # Copilot's current task plan
+│   │   └── gemini-latest.md # Gemini's current task plan
 │   └── temp/                # Temporary AI files (screenshots, samples, etc.)
 │       └── .gitkeep         # Placeholder (contents ignored by git)
 │
@@ -112,10 +115,13 @@ Update these with: `git submodule update --remote` or `update-external-refs.cmd`
 
 ### AI Context (`ai-context/`)
 - **`structure.md`** - This file, explaining project organization
-- **`tasks/`** - Task planning and implementation files
-  - **`latest.md`** - Current task implementation plan (created before coding)
+- **`tasks/`** - Task planning and implementation files (agent-specific naming)
+  - **`{agent-name}-latest.md`** - Agent-specific task implementation plans
+  - Examples: `claude-latest.md`, `chatgpt-latest.md`, `copilot-latest.md`, `gemini-latest.md`
+  - Each AI agent creates their own file to avoid conflicts
   - AI must write plan here and get approval before implementing
-  - Delete plan file after task completion and user satisfaction
+  - Delete plan file only after: task completion, successful compilation, git commit, and user approval
+  - **Multi-agent collaboration**: Multiple agents can work simultaneously without file conflicts
 - **`temp/`** - Place for temporary AI-consumable files (screenshots, code samples, etc.)
   - Contents are ignored by git (except `.gitkeep`)
   - AI agents should look here for user-provided samples/screenshots
