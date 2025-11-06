@@ -1,5 +1,26 @@
 # Auraditor Development Guide for AI Assistants
 
+## 🚨 MANDATORY FIRST STEP - TASK PLANNING 🚨
+
+**BEFORE DOING ANYTHING ELSE**, you MUST:
+
+1. ✍️ **CREATE** a detailed implementation plan in [ai-context/tasks/latest.md](ai-context/tasks/latest.md)
+2. 📅 **INCLUDE** date/time stamp in the plan
+3. 📋 **DOCUMENT**:
+   - What you understand the task to be
+   - Step-by-step implementation approach
+   - Files that will be modified
+   - Potential risks or considerations
+   - Testing approach
+4. ⏸️ **WAIT** for user approval before proceeding
+5. ✅ **DELETE** the plan file only after task completion and user satisfaction
+
+**⛔ DO NOT SKIP THIS STEP - NO EXCEPTIONS ⛔**
+
+If you proceed with implementation without creating this plan first, you are violating the development workflow.
+
+---
+
 ## START HERE - Project Structure
 **FIRST**: Read [ai-context/structure.md](ai-context/structure.md) for a complete overview of the project folder structure, file locations, and where to find specific functionality. This will save time and tokens by giving you immediate context.
 
@@ -11,12 +32,13 @@ Auraditor is a Burp Suite extension for testing Salesforce Lightning application
 ## Essential Development Workflow
 When making ANY changes to this project, you MUST follow this workflow:
 
-1. **Make your changes** to the Java source files
-2. **Compile and test** with: `mvn clean compile`
-3. **Package the JAR** with: `mvn clean package`
-4. **Commit changes** with: `git add . && git commit -m "Description of changes"`
+1. **Create implementation plan** in [ai-context/tasks/latest.md](ai-context/tasks/latest.md) and wait for approval
+2. **Make your changes** to the Java source files
+3. **Compile and test** with: `mvn clean compile`
+4. **Package the JAR** with: `mvn clean package`
+5. **Commit changes** with: `git add . && git commit -m "Description of changes"`
 
-The final JAR file will be at `target/auraditor-2.0.1.jar` - this is what users load into Burp Suite.
+The final JAR file will be at `target/auraditor-2.0.6.jar` - this is what users load into Burp Suite.
 
 ## Critical Resources - READ THESE FIRST
 
