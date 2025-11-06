@@ -21,7 +21,7 @@
    - Potential risks or considerations
    - Testing approach
 
-4. ⏸️ **WAIT** for user approval before proceeding
+4. ⏸️ **WAIT** for user changes and approval before proceeding
 
 5. ✅ **DELETE** the plan file only after:
    - Task is completed
