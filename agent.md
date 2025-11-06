@@ -143,11 +143,15 @@ Or use the provided update script: `update-external-refs.cmd`
 
 **Commit Authorship (Multi‑Agent)**
 - ✅ When an AI agent contributes code, commits should be authored by the human maintainer (e.g., `Soroush Dalili <1798313+irsdl@users.noreply.github.com>`) and co‑signed by the AI agent(s).
-- ✅ Add one trailer per AI agent in the commit message:
-  - `Co-Authored-By: ChatGPT <noreply@openai.com>`
-  - `Co-Authored-By: Claude <noreply@anthropic.com>`
+- ⚠️ **IMPORTANT**: Only use Co-Authored-By if the AI agent has a verified, safe GitHub email address that cannot be claimed by fraudulent users.
+- ✅ **Verified safe emails for AI agents**:
+  - `Co-Authored-By: Claude <noreply@anthropic.com>` - Safe for Claude Code and Claude AI
+- ❌ **Compromised/unsafe emails** (DO NOT USE):
+  - ~~`Co-Authored-By: ChatGPT <noreply@openai.com>`~~ - This email has been claimed by fraudulent GitHub user "soharaa"
+- ⚠️ **For AI agents without verified emails**: Do NOT add Co-Authored-By trailers. Instead, mention the AI contribution in the commit message body.
 - ✅ Keep identities consistent across commits for a clear audit trail.
-- ℹ️ Example: `git commit -m "Message" -m "" -m "Co-Authored-By: ChatGPT <noreply@openai.com>"`
+- ℹ️ Example: `git commit -m "Refactor code structure" -m "" -m "Co-Authored-By: Claude <noreply@anthropic.com>"`
+- ℹ️ Example (no safe email): `git commit -m "Add feature" -m "Implementation assisted by ChatGPT"`
 
 ### Safety & Constraints
 
