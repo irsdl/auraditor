@@ -213,7 +213,7 @@ Or use the provided update script: `update-external-refs.cmd`
 ## Key Architecture Points
 
 ### Main Files:
-- `src/main/java/auraditor/Auraditor.java` - Main extension entry point
+- `src/main/java/burp/BurpExtender.java` - Main extension entry point
 - `src/main/java/auraditor/suite/ui/ActionsTab.java` - Primary UI and functionality
 - `src/main/java/auraditor/requesteditor/ui/` - Request/response editor tabs
 
@@ -276,8 +276,9 @@ if (requestResponse.response().statedMimeType() == MimeType.SCRIPT) {
 - The extension targets Burp Suite Professional with Montoya API support
 
 ## Build Requirements
-- Java 11+
+- Java 21 or higher (required for compilation)
 - Maven 3.6+
+- Burp Suite Professional 2025.x or later with Montoya API 2025.8
 - Dependencies are managed in `pom.xml` with Maven Shade plugin for packaging
 
 ## BApp Store Compliance

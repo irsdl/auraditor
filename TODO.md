@@ -41,7 +41,7 @@ This document contains detailed specifications for future improvements to the Au
 
 **Implementation Details:**
 - **File:** `src/main/java/auraditor/suite/ui/ActionsTab.java`
-- **Current Template Location:** Line ~507
+- **Current Template Location:** Line 525
 - **Current Template:**
   ```java
   private static final String SPECIFIC_OBJECT_PAYLOAD_TEMPLATE = "{\"actions\":[{\"id\":\"100;a\",\"descriptor\":\"serviceComponent://ui.force.components.controllers.lists.selectableListDataProvider.SelectableListDataProviderController/ACTION$getItems\",\"callingDescriptor\":\"UNKNOWN\",\"params\":{\"entityNameOrId\":\"%s\",\"layoutType\":\"FULL\",\"pageSize\":1000,\"currentPage\":0,\"useTimeout\":false,\"getCount\":false,\"enableRowActions\":false}}]}";
@@ -54,8 +54,8 @@ This document contains detailed specifications for future improvements to the Au
    ```
 
 2. **Pagination Logic:**
-   - **Method:** `performSpecificObjectSearch()` (line ~2194)
-   - **Method:** `performBulkObjectRetrieval()` (line ~2232)
+   - **Method:** `performSpecificObjectSearch()` (line 2768)
+   - **Method:** `performBulkObjectRetrieval()` (line 2806)
    - **Logic:**
      - Start with page 1 (not 0)
      - Continue to next page only if current page returns exactly `pageSize` records
