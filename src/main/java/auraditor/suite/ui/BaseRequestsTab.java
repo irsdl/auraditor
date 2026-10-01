@@ -42,6 +42,7 @@ public class BaseRequestsTab {
     private final JPanel requestViewerPanel;
     private final HttpRequestEditor requestEditor;
     private Runnable onRequestsChangedCallback; // Callback for when requests are deleted
+    private Runnable onNotesChangedCallback; // Callback for when a request's notes are edited
 
     // Color annotation components
     private JCheckBox useColorAnnotationCheckBox;
@@ -522,6 +523,13 @@ public class BaseRequestsTab {
         this.onRequestsChangedCallback = callback;
     }
     
+    /**
+     * Set callback to be notified when a request's notes are edited
+     */
+    public void setOnNotesChangedCallback(Runnable callback) {
+        this.onNotesChangedCallback = callback;
+    }
+
     public Component getComponent() {
         return mainPanel;
     }
@@ -711,6 +719,9 @@ public class BaseRequestsTab {
             BaseRequest request = baseRequests.get(rowIndex);
             request.setNotes(value.toString());
             fireTableCellUpdated(rowIndex, columnIndex);
+            if (onNotesChangedCallback != null) {
+                onNotesChangedCallback.run();
+            }
         }
     }
 
