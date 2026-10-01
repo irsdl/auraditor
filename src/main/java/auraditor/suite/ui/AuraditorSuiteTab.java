@@ -31,11 +31,13 @@ public class AuraditorSuiteTab {
     private final JTabbedPane resultsTabbedPane;
     private final java.util.Map<String, ActionsTab.ObjectByNameResultPanel> existingObjectPanels;
     private final SalesforceIdGeneratorManager generatorManager;
+    private final AuraditorStateStore stateStore;
 
     public AuraditorSuiteTab(MontoyaApi api, SalesforceIdGeneratorManager generatorManager) {
         this.api = api;
         this.generatorManager = generatorManager;
-        this.baseRequests = new ArrayList<>();
+        this.stateStore = new AuraditorStateStore(api);
+        this.baseRequests = new ArrayList<>(stateStore.loadBaseRequests());
         this.existingObjectPanels = new java.util.HashMap<>();
         
         // Create main panel
@@ -99,6 +101,10 @@ public class AuraditorSuiteTab {
             @Override
             public void onOperationStateChanged(boolean isRunning) {
                 AuraditorSuiteTab.this.updateActionsTabTitle(isRunning);
+                if (!isRunning) {
+                    // Queue after the result tab updates posted by the finished operation
+                    SwingUtilities.invokeLater(AuraditorSuiteTab.this::saveResultTabs);
+                }
             }
         });
         this.tabbedPane.addTab("Actions", actionsTab.getComponent());
@@ -106,7 +112,9 @@ public class AuraditorSuiteTab {
         // Set up callback for BaseRequestsTab to notify Actions tab when requests change
         this.baseRequestsTab.setOnRequestsChangedCallback(() -> {
             actionsTab.refreshRequests();
+            stateStore.saveBaseRequests(baseRequests);
         });
+        this.baseRequestsTab.setOnNotesChangedCallback(() -> stateStore.saveBaseRequests(baseRequests));
 
         // Create and add Salesforce ID Lab tab
         SalesforceIdLabTab salesforceIdLabTab = new SalesforceIdLabTab(api, generatorManager);
@@ -137,6 +145,121 @@ public class AuraditorSuiteTab {
         
         // Add tabbed pane to main panel - no header needed
         this.mainPanel.add(tabbedPane, BorderLayout.CENTER);
+
+        // Restore state saved in the Burp project file
+        if (!baseRequests.isEmpty()) {
+            actionsTab.refreshRequests();
+            api.logging().logToOutput("Restored " + baseRequests.size() + " base request(s) from project file");
+        }
+        restoreResultTabs();
+    }
+
+    /**
+     * Recreate result tabs saved in the Burp project file
+     */
+    private void restoreResultTabs() {
+        List<String> restoredTitles = new ArrayList<>();
+        for (AuraditorStateStore.ResultTabState tab : stateStore.loadResultTabs()) {
+            try {
+                Component panel = createRestoredPanel(tab);
+                if (panel == null) {
+                    continue;
+                }
+                if (resultsTabbedPane.getTabCount() == 1 && "No Results".equals(resultsTabbedPane.getTitleAt(0))) {
+                    resultsTabbedPane.removeTabAt(0);
+                }
+                resultsTabbedPane.addTab(tab.title, panel);
+                restoredTitles.add(tab.title);
+            } catch (Exception e) {
+                api.logging().logToError("Failed to restore results tab '" + tab.title + "': " + e.getMessage());
+            }
+        }
+
+        if (!restoredTitles.isEmpty()) {
+            actionsTab.restoreResultCounters(restoredTitles);
+            api.logging().logToOutput("Restored " + restoredTitles.size() + " results tab(s) from project file");
+        }
+    }
+
+    private Component createRestoredPanel(AuraditorStateStore.ResultTabState tab) {
+        if (tab.type == null || tab.title == null) {
+            return null;
+        }
+        switch (tab.type) {
+            case AuraditorStateStore.ResultTabState.DISCOVERED_OBJECTS: {
+                ActionsTab.DiscoveryResult result = new ActionsTab.DiscoveryResult(
+                    new java.util.HashSet<>(orEmpty(tab.defaultObjects)),
+                    new java.util.HashSet<>(orEmpty(tab.customObjects)));
+                actionsTab.restoreDiscoveryResult(tab.title, result);
+                return new ActionsTab.DiscoveryResultPanel(result, api);
+            }
+            case AuraditorStateStore.ResultTabState.DISCOVERED_ROUTES: {
+                ActionsTab.RouteDiscoveryResult result = new ActionsTab.RouteDiscoveryResult();
+                if (tab.routes != null) {
+                    tab.routes.forEach((category, routes) -> result.addRouteCategory(category, orEmpty(routes)));
+                }
+                return new ActionsTab.DiscoveredRoutesResultPanel(result, api);
+            }
+            case AuraditorStateStore.ResultTabState.OBJECTS: {
+                ActionsTab.ObjectByNameResult result = new ActionsTab.ObjectByNameResult(
+                    tab.entries != null ? tab.entries : new java.util.LinkedHashMap<>());
+                actionsTab.restoreObjectResult(tab.title, result);
+                ActionsTab.ObjectByNameResultPanel panel = new ActionsTab.ObjectByNameResultPanel(result, baseRequests, api);
+                existingObjectPanels.put(tab.title, panel);
+                return panel;
+            }
+            case AuraditorStateStore.ResultTabState.RECORDS: {
+                if (tab.entries == null || tab.entries.isEmpty()) {
+                    return null;
+                }
+                ActionsTab.RetrievedRecordsResultPanel panel = null;
+                for (java.util.Map.Entry<String, String> record : tab.entries.entrySet()) {
+                    if (panel == null) {
+                        panel = new ActionsTab.RetrievedRecordsResultPanel(record.getKey(), record.getValue(), baseRequests, tab.requestId, api);
+                    } else {
+                        panel.addRecord(record.getKey(), record.getValue());
+                    }
+                }
+                return panel;
+            }
+            default:
+                return null;
+        }
+    }
+
+    private static <T> List<T> orEmpty(List<T> list) {
+        return list != null ? list : new ArrayList<>();
+    }
+
+    /**
+     * Save all result tabs to the Burp project file. Must run on the EDT.
+     */
+    private void saveResultTabs() {
+        List<AuraditorStateStore.ResultTabState> tabs = new ArrayList<>();
+        for (int i = 0; i < resultsTabbedPane.getTabCount(); i++) {
+            AuraditorStateStore.ResultTabState tab =
+                AuraditorStateStore.fromPanel(resultsTabbedPane.getTitleAt(i), resultsTabbedPane.getComponentAt(i));
+            if (tab != null) {
+                tabs.add(tab);
+            }
+        }
+        stateStore.saveResultTabs(tabs);
+    }
+
+    /**
+     * Save base requests and result tabs to the Burp project file
+     */
+    private void saveState() {
+        stateStore.saveBaseRequests(baseRequests);
+        try {
+            if (SwingUtilities.isEventDispatchThread()) {
+                saveResultTabs();
+            } else {
+                SwingUtilities.invokeAndWait(this::saveResultTabs);
+            }
+        } catch (Exception e) {
+            api.logging().logToError("Failed to save result tabs: " + e.getMessage());
+        }
     }
 
     /**
@@ -548,6 +671,7 @@ public class AuraditorSuiteTab {
     public void addBaseRequest(HttpRequestResponse requestResponse, String notes) {
         BaseRequest baseRequest = new BaseRequest(requestResponse, notes);
         baseRequests.add(baseRequest);
+        stateStore.saveBaseRequests(baseRequests);
         baseRequestsTab.refreshTable();
         
         // Refresh the actions tab to update the request selector
@@ -686,6 +810,8 @@ public class AuraditorSuiteTab {
                 api.logging().logToOutput("Deleted results tab: " + tabTitle);
             }
 
+            saveResultTabs();
+
             // If no more tabs, add "No Results" tab back
             if (resultsTabbedPane.getTabCount() == 0) {
                 resultsTabbedPane.addTab("No Results", new JLabel("No results yet", SwingConstants.CENTER));
@@ -707,6 +833,9 @@ public class AuraditorSuiteTab {
      */
     public void cleanup() {
         try {
+            // Save state to the project file before tearing anything down
+            saveState();
+
             // Cleanup the actions tab which contains most threads
             if (actionsTab != null) {
                 actionsTab.cleanup();

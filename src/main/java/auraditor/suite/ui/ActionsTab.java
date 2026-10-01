@@ -5025,6 +5025,10 @@ public class ActionsTab {
         private String[] originalCategories;
         private boolean isFiltered = false;
 
+        public DiscoveryResult getDiscoveryResult() {
+            return discoveryResult;
+        }
+
         public DiscoveryResultPanel(DiscoveryResult discoveryResult, MontoyaApi api) {
             this.api = api;
             this.discoveryResult = discoveryResult;
@@ -5479,6 +5483,10 @@ public class ActionsTab {
         private DefaultListModel<String> originalCategoryModel;
         private DefaultListModel<String> filteredCategoryModel;
         private boolean isFiltered = false;
+
+        public RouteDiscoveryResult getRouteDiscoveryResult() {
+            return routeDiscoveryResult;
+        }
 
         public DiscoveredRoutesResultPanel(RouteDiscoveryResult routeDiscoveryResult, MontoyaApi api) {
             this.api = api;
@@ -5963,6 +5971,18 @@ public class ActionsTab {
         private DefaultListModel<String> originalObjectModel;
         private DefaultListModel<String> filteredObjectModel;
         
+        /**
+         * Get the objects currently shown in this panel, in display order
+         */
+        public java.util.Map<String, String> getObjectEntries() {
+            java.util.Map<String, String> entries = new java.util.LinkedHashMap<>();
+            for (int i = 0; i < originalObjectModel.size(); i++) {
+                String objectName = originalObjectModel.get(i);
+                entries.put(objectName, currentObjectData.get(objectName));
+            }
+            return entries;
+        }
+
         public ObjectByNameResultPanel(ObjectByNameResult objectByNameResult, List<BaseRequest> baseRequests, MontoyaApi api) {
             this.objectByNameResult = objectByNameResult;
             this.baseRequests = baseRequests;
@@ -6998,6 +7018,23 @@ public class ActionsTab {
         private final MontoyaApi api;
         private final java.util.Map<String, String> recordDataMap; // Maps recordId -> recordData
 
+        /**
+         * Get the records currently shown in this panel, in display order
+         */
+        public java.util.Map<String, String> getRecords() {
+            java.util.Map<String, String> records = new java.util.LinkedHashMap<>();
+            ListModel<String> model = recordList.getModel();
+            for (int i = 0; i < model.getSize(); i++) {
+                String id = model.getElementAt(i);
+                records.put(id, recordDataMap.get(id));
+            }
+            return records;
+        }
+
+        public String getRequestId() {
+            return requestId;
+        }
+
         public RetrievedRecordsResultPanel(String recordId, String recordData, List<BaseRequest> baseRequests, String requestId, MontoyaApi api) {
             this.recordId = recordId;
             this.recordData = recordData;
@@ -7586,6 +7623,45 @@ public class ActionsTab {
      */
     public boolean isProcessing() {
         return currentOperationThread != null && currentOperationThread.isAlive();
+    }
+
+    /**
+     * Restore a discovery result loaded from the Burp project file so "Get Objects" actions work again
+     */
+    public void restoreDiscoveryResult(String resultId, DiscoveryResult discoveryResult) {
+        discoveredDefaultObjects.clear();
+        discoveredDefaultObjects.addAll(discoveryResult.getDefaultObjects());
+        discoveredCustomObjects.clear();
+        discoveredCustomObjects.addAll(discoveryResult.getCustomObjects());
+        hasDiscoveryResults = true;
+        addDiscoveryResult(resultId);
+        updateUIForRequestAvailability(!baseRequests.isEmpty());
+    }
+
+    /**
+     * Restore an object results tab loaded from the Burp project file so new results can be appended to it
+     */
+    public void restoreObjectResult(String tabId, ObjectByNameResult objectResult) {
+        tabObjectResults.put(tabId, objectResult);
+    }
+
+    /**
+     * Advance result counters past restored tab titles so new results don't reuse an existing tab name
+     */
+    public void restoreResultCounters(java.util.Collection<String> tabTitles) {
+        for (String title : tabTitles) {
+            discoverResultCounter = Math.max(discoverResultCounter, parseResultNumber(title, "^Discovered Objects (\\d+) - Req \\d+$"));
+            routeDiscoveryResultCounter = Math.max(routeDiscoveryResultCounter, parseResultNumber(title, "^Discovered Routes (\\d+)$"));
+            retrievedObjectsResultCounter = Math.max(retrievedObjectsResultCounter, parseResultNumber(title, "^Retrieved Objects (\\d+)$"));
+            retrievedRecordsResultCounter = Math.max(retrievedRecordsResultCounter, parseResultNumber(title, "^Retrieved Records (\\d+)$"));
+            objByNameResultCounter = Math.max(objByNameResultCounter, parseResultNumber(title, "^ObjByName-Request\\d+-(\\d+)$"));
+            objsByWordlistResultCounter = Math.max(objsByWordlistResultCounter, parseResultNumber(title, "^ObjsByWordList-Request\\d+-(\\d+)$"));
+        }
+    }
+
+    private static int parseResultNumber(String title, String regex) {
+        Matcher matcher = Pattern.compile(regex).matcher(title);
+        return matcher.matches() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
     /**

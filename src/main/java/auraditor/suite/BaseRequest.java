@@ -32,6 +32,17 @@ public class BaseRequest {
         this.url = requestResponse.request().url();
         this.notes = notes != null ? notes : "";
     }
+
+    /**
+     * Recreate a base request with a known ID (used when restoring from the Burp project file)
+     */
+    public BaseRequest(int id, HttpRequestResponse requestResponse, String notes) {
+        this.id = id;
+        nextId = Math.max(nextId, id + 1);
+        this.requestResponse = requestResponse;
+        this.url = requestResponse.request().url();
+        this.notes = notes != null ? notes : "";
+    }
     
     public int getId() {
         return id;

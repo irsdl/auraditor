@@ -34,6 +34,7 @@ Developed by **Soroush Dalili ([@irsdl](https://github.com/irsdl))**.
 - Save multiple base requests from HTTP history
 - Tag requests with custom names
 - Use saved requests for security testing operations
+- Base requests and result tabs are saved in the Burp project file and restored when the extension or Burp is reloaded
 
 ### Discovery Operations
 - Find Aura controllers and methods from JavaScript files
